@@ -1,162 +1,174 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#0f172a">
-<meta name="description" content="Score Cekih by Sadewa Corp">
-
-<link rel="manifest" href="manifest.json">
-
-<link rel="icon" type="image/png" sizes="192x192" href="classic-192.png">
-<link rel="apple-touch-icon" href="classic-192.png">
-
-<title>Score Cekih by Sadewa Corp</title>
-
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Score Cekih by Sadewa Corp</title>
+    <meta name="description" content="Aplikasi Penghitung Skor Premium">
+    <meta name="theme-color" content="#1a1410">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="classic-192.png">
+    <link rel="apple-touch-icon" href="classic-192.png">
+    <link rel="stylesheet" href="style.css">
 </head>
-<body class="dark">
-
-<div id="loadingScreen">
-    <div class="loading-content">
-        <img src="classic-512.png" class="loading-logo" alt="Logo">
-        <h1>Score Cekih</h1>
-        <p>by Sadewa Corp</p>
-
-        <div class="loading-bar">
-            <div class="loading-progress" id="loadingProgress"></div>
+<body class="dark-mode">
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen active">
+        <div class="loading-content">
+            <img src="classic-512.png" alt="Logo Score Cekih" class="logo-loading">
+            <h2 class="app-title">Score Cekih</h2>
+            <p class="app-subtitle">by Sadewa Corp</p>
+            <div class="loading-bar-container">
+                <div id="loadingBar" class="loading-bar"></div>
+            </div>
         </div>
     </div>
-</div>
 
-<div id="fireAnimation"></div>
-<div id="starAnimation"></div>
+    <!-- Header -->
+    <header class="app-header">
+        <div class="header-left">
+            <img src="classic-192.png" alt="Logo" class="logo-mini">
+            <h1>Score Cekih</h1>
+        </div>
+        <div class="header-right">
+            <button id="btnFullscreen" class="icon-btn" title="Layar Penuh">⛶</button>
+            <button id="btnScreenshot" class="icon-btn" title="Ambil Gambar">📸</button>
+            <button id="btnTheme" class="icon-btn" title="Ganti Tema">☀️</button>
+        </div>
+    </header>
 
-<div id="app">
+    <!-- Info Permainan -->
+    <section class="game-info">
+        <div class="info-card">
+            <span>RONDE: <span id="rondeInfo">1</span></span>
+        </div>
+        <div class="info-card">
+            <span>PUTERAN: <span id="puteranInfo">0</span></span>
+        </div>
+        <div class="info-card">
+            <span>TARGET: <span id="targetInfo">1000</span></span>
+        </div>
+        <button id="btnUndo" class="btn-undo" title="Batalkan Langkah Terakhir">↩️ UNDO</button>
+    </section>
 
-<header class="topbar">
+    <!-- Halaman Setup Awal -->
+    <div id="setupPage" class="page active">
+        <div class="page-content">
+            <h2 class="section-title">Pengaturan Permainan</h2>
+            <div class="form-group">
+                <label>Nama Pemain A</label>
+                <input type="text" id="namaA" class="input-text" value="Pemain A" maxlength="20">
+            </div>
+            <div class="form-group">
+                <label>Nama Pemain B</label>
+                <input type="text" id="namaB" class="input-text" value="Pemain B" maxlength="20">
+            </div>
+            <div class="form-group">
+                <label>Nama Pemain C</label>
+                <input type="text" id="namaC" class="input-text" value="Pemain C" maxlength="20">
+            </div>
+            <div class="form-group">
+                <label>Nama Pemain D</label>
+                <input type="text" id="namaD" class="input-text" value="Pemain D" maxlength="20">
+            </div>
+            <div class="form-group">
+                <label>Target Kemenangan</label>
+                <input type="number" id="targetMenang" class="input-number" value="1000" min="100" max="10000">
+            </div>
+            <button id="btnMulaiPermainan" class="btn-primary btn-block">MULAI PERMAINAN</button>
+        </div>
+    </div>
 
-<div class="brand">
-<img src="classic-512.png" alt="Logo">
-<div>
-<h2>Score Cekih</h2>
-<small>by Sadewa Corp</small>
-</div>
-</div>
+    <!-- Halaman Utama Permainan -->
+    <div id="gamePage" class="page">
+        <div class="page-content">
+            <div id="pemainContainer" class="players-grid"></div>
 
-<div class="top-actions">
-<button id="themeBtn">🌙</button>
-<button id="fullscreenBtn">⛶</button>
-<button id="screenshotBtn">📸</button>
-</div>
+            <!-- Input Skor Langsung -->
+            <div class="input-section">
+                <h3 class="section-subtitle">Masukkan Tambahan Skor</h3>
+                <div class="score-input-grid">
+                    <div class="input-item">
+                        <label id="labelA">Pemain A</label>
+                        <input type="number" id="skorA" class="input-point" placeholder="±0" min="-1000" max="1000" step="1">
+                    </div>
+                    <div class="input-item">
+                        <label id="labelB">Pemain B</label>
+                        <input type="number" id="skorB" class="input-point" placeholder="±0" min="-1000" max="1000" step="1">
+                    </div>
+                    <div class="input-item">
+                        <label id="labelC">Pemain C</label>
+                        <input type="number" id="skorC" class="input-point" placeholder="±0" min="-1000" max="1000" step="1">
+                    </div>
+                    <div class="input-item">
+                        <label id="labelD">Pemain D</label>
+                        <input type="number" id="skorD" class="input-point" placeholder="±0" min="-1000" max="1000" step="1">
+                    </div>
+                </div>
+                <button id="btnSimpanPuteran" class="btn-success btn-block">SIMPAN PUTERAN</button>
+            </div>
+        </div>
+    </div>
 
-</header>
+    <!-- Tab Navigasi -->
+    <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="main">Permainan</button>
+        <button class="tab-btn" data-tab="ranking">Ranking</button>
+        <button class="tab-btn" data-tab="history">Riwayat</button>
+        <button class="tab-btn" data-tab="achievement">Pencapaian</button>
+        <button class="tab-btn" data-tab="statistik">Statistik</button>
+        <button class="tab-btn" data-tab="arsip">Arsip</button>
+    </nav>
 
-<section id="setupSection" class="card">
+    <!-- Halaman Tab -->
+    <div id="tabRanking" class="tab-page">
+        <h2 class="section-title">Ranking Saat Ini</h2>
+        <div id="rankingList" class="list-container"></div>
+    </div>
 
-<h3>Setup Permainan</h3>
+    <div id="tabHistory" class="tab-page">
+        <h2 class="section-title">Riwayat Permainan</h2>
+        <div id="historyList" class="list-container reverse"></div>
+    </div>
 
-<div class="grid2">
-<input id="playerA" placeholder="Nama Pemain A" value="Pemain A">
-<input id="playerB" placeholder="Nama Pemain B" value="Pemain B">
-<input id="playerC" placeholder="Nama Pemain C" value="Pemain C">
-<input id="playerD" placeholder="Nama Pemain D" value="Pemain D">
-</div>
+    <div id="tabAchievement" class="tab-page">
+        <h2 class="section-title">Pencapaian</h2>
+        <div id="achievementList" class="achievement-grid"></div>
+    </div>
 
-<label>Target Kemenangan</label>
-<input id="targetScore" type="number" value="1000">
+    <div id="tabStatistik" class="tab-page">
+        <h2 class="section-title">Statistik Pemain Aktif</h2>
+        <div id="statistikList" class="statistik-grid"></div>
+    </div>
 
-<button id="startGameBtn" class="primary-btn">
-🎮 MULAI PERMAINAN
-</button>
+    <div id="tabArsip" class="tab-page">
+        <h2 class="section-title">Arsip Semua Pemain</h2>
+        <div id="arsipList" class="list-container"></div>
+    </div>
 
-</section>
+    <!-- Tombol Reset -->
+    <button id="btnResetGame" class="btn-reset">🗑️ RESET PERMAINAN</button>
 
-<section id="gameSection" class="hidden">
+    <!-- Popup Umum -->
+    <div id="popupOverlay" class="popup-overlay">
+        <div id="popupBox" class="popup-box">
+            <div id="popupContent"></div>
+            <div class="popup-buttons">
+                <button id="popupBtn1" class="btn-secondary">Batal</button>
+                <button id="popupBtn2" class="btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
 
-<div class="game-info card">
-<div>
-<h3 id="roundText">RONDE 1</h3>
-<p id="turnText">PUTERAN 1</p>
-</div>
-</div>
+    <!-- Animasi Khusus -->
+    <canvas id="fireCanvas" class="animation-canvas"></canvas>
+    <canvas id="starCanvas" class="animation-canvas"></canvas>
 
-<div id="playerCards"></div>
+    <!-- Audio -->
+    <audio id="audioGod" src="godofgambler.wav" preload="auto">
+    <audio id="audioNol" src="dimulaidari0.wav" preload="auto">
 
-<div class="card">
-
-<h3>Input Skor Puteran</h3>
-
-<div id="scoreInputs"></div>
-
-<button id="saveTurnBtn" class="primary-btn">
-💾 SIMPAN PUTERAN
-</button>
-
-</div>
-
-<div class="action-row">
-<button id="undoBtn">↩ UNDO</button>
-<button id="editNamesBtn">✏️ EDIT NAMA</button>
-</div>
-
-<div class="tabs">
-
-<button class="tab-btn active" data-tab="rankingTab">Ranking</button>
-<button class="tab-btn" data-tab="historyTab">History</button>
-<button class="tab-btn" data-tab="achievementTab">Achievement</button>
-<button class="tab-btn" data-tab="statsTab">Statistik</button>
-<button class="tab-btn" data-tab="archiveTab">Arsip Pemain</button>
-
-</div>
-
-<div class="tab-content active" id="rankingTab">
-<div class="card">
-<ul id="rankingList"></ul>
-</div>
-</div>
-
-<div class="tab-content" id="historyTab">
-<div class="card">
-<ul id="historyList"></ul>
-</div>
-</div>
-
-<div class="tab-content" id="achievementTab">
-<div class="card">
-<div id="achievementList"></div>
-</div>
-</div>
-
-<div class="tab-content" id="statsTab">
-<div class="card">
-<div id="statsList"></div>
-</div>
-</div>
-
-<div class="tab-content" id="archiveTab">
-<div class="card">
-<div id="archiveList"></div>
-</div>
-</div>
-
-</section>
-
-<button id="resetBtn">
-🗑 RESET GAME
-</button>
-
-</div>
-
-<audio id="godOfGamblerAudio" preload="auto">
-<source src="godofgambler.wav" type="audio/wav">
-</audio>
-
-<audio id="resetAudio" preload="auto">
-<source src="dimulaidari0.wav" type="audio/wav">
-</audio>
-
-<script src="app.js"></script>
-
+    <!-- Script -->
+    <script src="app.js"></script>
 </body>
 </html>
