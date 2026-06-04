@@ -2,7 +2,7 @@
 // KONFIGURASI DASAR & VARIABEL GLOBAL
 // ==============================================
 const APLIKASI = {
-    versi: "1.1.4",
+    versi: "1.1.7",
     nama: "Score Cekih",
     pembuat: "Sadewa Corp",
     defaultTarget: 1000,
@@ -17,10 +17,10 @@ let appState = {
     puteran: 0,
     targetKemenangan: APLIKASI.defaultTarget,
     pemain: [
-        { id: "a", nama: "Pemain A", skor: 0, posisiSebelumnya: 1, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0 },
-        { id: "b", nama: "Pemain B", skor: 0, posisiSebelumnya: 2, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0 },
-        { id: "c", nama: "Pemain C", skor: 0, posisiSebelumnya: 3, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0 },
-        { id: "d", nama: "Pemain D", skor: 0, posisiSebelumnya: 4, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0 }
+        { id: "a", nama: "Pemain A", skor: 0, posisiSebelumnya: 1, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false },
+        { id: "b", nama: "Pemain B", skor: 0, posisiSebelumnya: 2, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false },
+        { id: "c", nama: "Pemain C", skor: 0, posisiSebelumnya: 3, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false },
+        { id: "d", nama: "Pemain D", skor: 0, posisiSebelumnya: 4, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false }
     ],
     riwayat: [],
     arsipPemain: {},
@@ -135,25 +135,18 @@ function selesaikanLayarMuat() {
 // INISIALISASI ELEMEN & ACARA
 // ==============================================
 function inisialisasiElemenAntarmuka() {
-    // Tombol Umum
     document.getElementById("btnTheme").addEventListener("click", gantiTema);
     document.getElementById("btnFullscreen").addEventListener("click", masukLayarPenuh);
     document.getElementById("btnScreenshot").addEventListener("click", ambilTangkapanLayar);
     document.getElementById("btnUndo").addEventListener("click", batalkanLangkahTerakhir);
     document.getElementById("btnResetGame").addEventListener("click", tampilkanKonfirmasiReset);
-
-    // Halaman Pengaturan
     document.getElementById("btnMulaiPermainan").addEventListener("click", mulaiPermainanBaru);
-
-    // Tombol Simpan Skor
     document.getElementById("btnSimpanPuteran").addEventListener("click", simpanPuteranSkor);
 
-    // Navigasi Tab
     document.querySelectorAll(".tab-btn").forEach(tombol => {
         tombol.addEventListener("click", () => bukaTab(tombol.dataset.tab));
     });
 
-    // Popup
     document.getElementById("popupBtn1").addEventListener("click", tutupPopup);
     document.getElementById("popupBtn2").addEventListener("click", tutupPopup);
 }
@@ -242,6 +235,7 @@ function simpanPuteranSkor() {
     appState.puteran++;
     tambahRiwayat(`📝 Puteran ${appState.puteran}: ${appState.pemain.map((p,i) => `${p.nama} +${tambahan[i]}`).join(", ")}`);
 
+    // ✅ CEK BAKARAN SESUAI ATURAN BARU
     cekKandidatTerbakar();
 
     const pemenang = cekPemenangRonde();
@@ -275,20 +269,31 @@ function urutkanPemain() {
     });
 }
 
+// ✅ FUNGSI INI YANG SUDAH DIPERBAIKI SESUAI MAUMU
 function cekKandidatTerbakar() {
+    // Awalnya semua tidak bisa dibakar
+    appState.pemain.forEach(p => p.dapatTerbakar = false);
+
     for (let i = 0; i < appState.pemain.length; i++) {
-        const pemainSekarang = appState.pemain[i];
-        if (pemainSekarang.skor <= 0) {
-            pemainSekarang.dapatTerbakar = false;
-            continue;
-        }
-        const posisiSebelumnya = pemainSekarang.posisiSebelumnya;
+        const pemainMaju = appState.pemain[i];
+
+        // Kalau yang maju nilainya negatif/0, tidak bisa membakar siapa pun
+        if (pemainMaju.skor <= 0) continue;
+
+        const posisiSebelumnya = pemainMaju.posisiSebelumnya;
         const posisiSekarang = i + 1;
+
+        // Kalau benar-benar maju posisinya
         if (posisiSekarang < posisiSebelumnya) {
-            const pemainYangTerlewati = appState.pemain.filter((p, idx) => {
-                return idx > i && p.posisiSebelumnya < posisiSebelumnya && p.skor <= pemainSekarang.skor && p.skor > 0;
+            // Cari orang yang posisinya tadi di atas, sekarang di BAWAH, DAN NILAINYA POSITIF
+            const yangBisaDibakar = appState.pemain.filter((p, indeks) => {
+                return indeks > i                  // Sekarang ada di bawah
+                    && p.posisiSebelumnya < posisiSebelumnya // Tadi ada di atas
+                    && p.skor > 0;                // ✅ PENTING: HANYA YANG POSITIF SAJA
             });
-            pemainYangTerlewati.forEach(p => p.dapatTerbakar = true);
+
+            // Tandai mereka yang bisa dibakar
+            yangBisaDibakar.forEach(p => p.dapatTerbakar = true);
         }
     }
 }
@@ -333,18 +338,22 @@ function mulaiRondeBaru() {
 }
 
 // ==============================================
-// SISTEM BAKARAN (SUDAH SESUAI ATURAN MINUS)
+// ✅ SISTEM BAKARAN SESUAI SEMUA ATURAN
 // ==============================================
 function tampilkanPopupPilihPelaku(idKorban) {
     const korban = appState.pemain.find(p => p.id === idKorban);
-    if (!korban || !korban.dapatTerbakar) return;
+    // Cek ulang: tidak bisa dibakar kalau nilainya tidak positif
+    if (!korban || !korban.dapatTerbakar || korban.skor <= 0) {
+        tampilkanPesanPeringatan("❌ Tidak bisa dibakar! Hanya pemain dengan nilai positif yang bisa dibakar.");
+        return;
+    }
 
     const pilihanPelaku = appState.pemain.filter(p => p.id !== idKorban);
     const opsiHtml = pilihanPelaku.map(p => `<option value="${p.id}">${p.nama}</option>`).join("");
 
     tampilkanPopup(`
         <h3>🔥 Siapa yang membakar?</h3>
-        <p>Korban: <strong>${korban.nama}</strong></p>
+        <p>Korban: <strong>${korban.nama} (Nilai: ${formatAngka(korban.skor)})</strong></p>
         <select id="pilihPelaku" class="input-text">${opsiHtml}</select>
     `, () => {
         const idPelaku = document.getElementById("pilihPelaku").value;
@@ -360,13 +369,13 @@ function prosesBakaran(pelaku, korban) {
     const cuplikanSebelum = buatCuplikanPenuh();
     appState.cuplikanSebelumnya.push(cuplikanSebelum);
 
-    const skorAwalKorban = korban.skor;
+    const nilaiAwalKorban = korban.skor; // Pasti POSITIF di sini
 
     pelaku.membakar++;
     korban.dibakar++;
 
-    const jumlahDibakarPutaranIni = appState.pemain.filter(p => p.dapatTerbakar && p.id !== korban.id).length + 1;
-    if (jumlahDibakarPutaranIni >= 3) {
+    const jumlahYangBisaDibakar = appState.pemain.filter(p => p.dapatTerbakar).length;
+    if (jumlahYangBisaDibakar >= 3) {
         pelaku.tripleBakar++;
         antrekanSuara("Triple Burn");
         tambahRiwayat(`💣 TRIPLE BURN - ${pelaku.nama} membakar 3 pemain sekaligus!`);
@@ -375,28 +384,27 @@ function prosesBakaran(pelaku, korban) {
     antrekanSuara(`${pelaku.nama} membakar ${korban.nama}`);
 
     setTimeout(() => {
-        // ✅ Cuma bunyi kalau tadi nilainya POSITIF, MINUS tidak bunyi
-        if (skorAwalKorban > 0) {
-            mainkanAudio("audioNol");
-            tambahAnimasiApi();
-        }
+        // ✅ Nilai awal pasti positif, jadi SUARA BERBUNYI
+        mainkanAudio("audioNol");
+        tambahAnimasiApi();
 
         setTimeout(() => {
+            // ✅ NILAINYA LANGSUNG JADI 0
             korban.skor = 0;
             korban.dapatTerbakar = false;
-            tambahRiwayat(`🔥 ${pelaku.nama} membakar ${korban.nama}!`);
+            tambahRiwayat(`🔥 ${pelaku.nama} membakar ${korban.nama}! Nilai dikembalikan ke 0`);
 
             urutkanPemain();
             perbaruiSemuaAntarmuka();
             catatKeArsipPemain();
             simpanDataKePenyimpanan();
             appState.sedangProses = false;
-        }, skorAwalKorban > 0 ? 1200 : 200);
+        }, 1200);
     }, 800);
 }
 
 // ==============================================
-// ✅ FUNGSI INI YANG DIPERBAIKI AGAR NAMA BERUBAH DI SEMUA BAGIAN
+// PERBARUI ANTARMUKA
 // ==============================================
 function perbaruiSemuaAntarmuka() {
     document.getElementById("rondeInfo").textContent = appState.ronde;
@@ -405,11 +413,11 @@ function perbaruiSemuaAntarmuka() {
     document.getElementById("btnUndo").disabled = appState.cuplikanSebelumnya.length === 0;
 
     perbaruiKartuPemain();
-    perbaruiNamaDiKolomInput(); // ✅ FUNGSI INI YANG DIPERBAIKI TOTAL!
+    perbaruiNamaDiKolomInput();
     perbaruiTabRanking();
     perbaruiTabRiwayat();
-    perbaruiTabPencapaian();
     perbaruiTabStatistik();
+    perbaruiTabPencapaian();
     perbaruiTabArsip();
 }
 
@@ -419,7 +427,9 @@ function perbaruiKartuPemain() {
 
     appState.pemain.forEach(pemain => {
         const kelasNegatif = pemain.skor < 0 ? "negatif" : "";
-        const kelasBakar = pemain.dapatTerbakar ? "unlocked" : "locked";
+        // ✅ Tombol bakar mati otomatis kalau nilainya <= 0
+        const kelasBakar = (pemain.dapatTerbakar && pemain.skor > 0) ? "aktif" : "mati";
+        const teksTombol = pemain.skor <= 0 ? "Nilai minus/0" : (pemain.dapatTerbakar ? "🔥 BAKAR SEKARANG" : "Belum bisa dibakar");
         const teksBintang = pemain.bintang > 0 ? `<span>⭐ ${pemain.bintang}</span>` : "Belum ada";
 
         const kartu = document.createElement("div");
@@ -435,8 +445,8 @@ function perbaruiKartuPemain() {
             <div class="info-bintang">
                 Bintang: ${teksBintang}
             </div>
-            <button class="btn-bakar ${kelasBakar}" data-id="${pemain.id}">
-                🔥 ${pemain.dapatTerbakar ? "BAKAR SEKARANG" : "BELUM BISA DIBAKAR"}
+            <button class="btn-bakar ${kelasBakar}" data-id="${pemain.id}" ${kelasBakar === "mati" ? "disabled" : ""}>
+                ${teksTombol}
             </button>
         `;
         wadah.appendChild(kartu);
@@ -450,7 +460,6 @@ function perbaruiKartuPemain() {
     });
 }
 
-// ✅ FUNGSI KHUSUS YANG SUDAH DIPERBAIKI AGAR NAMA DI INPUT SELALU SESUAI
 function perbaruiNamaDiKolomInput() {
     document.getElementById("labelSkorA").textContent = appState.pemain[0].nama;
     document.getElementById("labelSkorB").textContent = appState.pemain[1].nama;
@@ -474,7 +483,7 @@ function tampilkanEditNama(idPemain) {
             }
             pemain.nama = namaBaru;
             catatKeArsipPemain();
-            perbaruiSemuaAntarmuka(); // ✅ Langsung panggil ulang biar semuanya berubah sekaligus
+            perbaruiSemuaAntarmuka();
             simpanDataKePenyimpanan();
         }
     });
@@ -486,7 +495,7 @@ function tambahRiwayat(teks) {
 }
 
 // ==============================================
-// SISTEM SUARA & TTS
+// SISTEM SUARA & BANTUAN LAINNYA
 // ==============================================
 function inisialisasiSuara() {
     if (!window.speechSynthesis) return;
@@ -500,202 +509,84 @@ function antrekanSuara(teks) {
 function lanjutkanAntreanSuara() {
     if (appState.sedangBerbicara || appState.antreanSuara.length === 0 || !window.speechSynthesis) return;
 
-    const teksBerikutnya = appState.antreanSuara.shift();
-    const ucapan = new SpeechSynthesisUtterance(teksBerikutnya);
+    const teks = appState.antreanSuara.shift();
+    const ucapan = new SpeechSynthesisUtterance(teks);
     ucapan.lang = "id-ID";
-    ucapan.rate = 1.05;
+    ucapan.rate = 1;
     ucapan.pitch = 1;
 
     ucapan.onstart = () => appState.sedangBerbicara = true;
     ucapan.onend = ucapan.onerror = () => {
         appState.sedangBerbicara = false;
-        setTimeout(lanjutkanAntreanSuara, 120);
     };
 
-    speechSynthesis.speak(ucapan);
+    window.speechSynthesis.speak(ucapan);
 }
 
 function jalankanUrutanSuaraSetelahPuteran() {
-    const pemainTerendah = cariPemainSkorTerendah();
-    antrekanSuara(`Silakan ${pemainTerendah.nama} kocok kartunya`);
-
-    setTimeout(() => {
-        appState.pemain.forEach(p => {
-            const angkaDalamBahasa = numberToBahasaIndonesia(p.skor);
-            antrekanSuara(`${p.nama} total poin ${angkaDalamBahasa}`);
-        });
-    }, 1200);
+    const pemainTerbawah = cariPemainPosisiTerbawah();
+    if (pemainTerbawah) {
+        antrekanSuara(`Giliran ${pemainTerbawah.nama} kocok kartu`);
+    }
 }
 
-function cariPemainSkorTerendah() {
-    let pemainMinus = appState.pemain.filter(p => p.skor < 0);
-    if (pemainMinus.length > 0) {
-        return pemainMinus.sort((a,b) => a.skor - b.skor)[0];
-    }
+function cariPemainPosisiTerbawah() {
     return [...appState.pemain].sort((a,b) => a.skor - b.skor)[0];
 }
 
-function mainkanAudio(idElemen) {
-    const audio = document.getElementById(idElemen);
-    if (!audio) return;
-    audio.currentTime = 0;
-    audio.play().catch(() => {});
+function mainkanAudio(id) {
+    const audio = document.getElementById(id);
+    if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(err => console.log("Gagal memutar suara:", err));
+    }
 }
 
-// ==============================================
-// FUNGSI BANTU & KONVERSI
-// ==============================================
+function tambahAnimasiApi() {
+    const kanvas = document.getElementById("fireCanvas");
+    kanvas.classList.add("aktif");
+    setTimeout(() => kanvas.classList.remove("aktif"), 1200);
+}
+
+function tambahAnimasiBintang() {
+    const kanvas = document.getElementById("starCanvas");
+    kanvas.classList.add("aktif");
+    setTimeout(() => kanvas.classList.remove("aktif"), 2500);
+}
+
 function formatAngka(angka) {
-    return angka >= 0 ? `+${angka}` : `${angka}`;
+    return angka < 0 ? `${angka}` : `+${angka}`;
 }
 
-function numberToBahasaIndonesia(angka) {
-    if (angka === 0) return "nol";
-    const negatif = angka < 0;
-    angka = Math.abs(angka);
-    const satuan = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan"];
-    const belasan = ["sepuluh", "sebelas", "dua belas", "tiga belas", "empat belas", "lima belas", "enam belas", "tujuh belas", "delapan belas", "sembilan belas"];
-    const puluhan = ["", "", "dua puluh", "tiga puluh", "empat puluh", "lima puluh", "enam puluh", "tujuh puluh", "delapan puluh", "sembilan puluh"];
-
-    function ubahRatus(n) {
-        let hasil = "";
-        const ratus = Math.floor(n / 100);
-        const sisa = n % 100;
-        if (ratus > 0) hasil += ratus === 1 ? "seratus " : satuan[ratus] + " ratus ";
-        if (sisa > 0) hasil += ubahPuluh(sisa);
-        return hasil.trim();
-    }
-
-    function ubahPuluh(n) {
-        if (n < 10) return satuan[n];
-        if (n < 20) return belasan[n - 10];
-        const puluh = Math.floor(n / 10);
-        const sisa = n % 10;
-        return puluhan[puluh] + (sisa > 0 ? " " + satuan[sisa] : "");
-    }
-
-    let hasilAkhir;
-    if (angka < 100) hasilAkhir = ubahPuluh(angka);
-    else if (angka < 1000) hasilAkhir = ubahRatus(angka);
-    else if (angka < 2000) hasilAkhir = "seribu " + ubahRatus(angka - 1000);
-    else if (angka < 10000) hasilAkhir = ubahPuluh(Math.floor(angka / 1000)) + " ribu " + ubahRatus(angka % 1000);
-    else return angka.toString();
-
-    return negatif ? "minus " + hasilAkhir : hasilAkhir;
-}
-
-// ==============================================
-// TAB & RINCIAN
-// ==============================================
-function bukaTab(namaTab) {
-    document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
-    document.querySelectorAll(".tab-page").forEach(p => p.classList.remove("active"));
-    document.querySelector(`[data-tab="${namaTab}"]`).classList.add("active");
-    document.getElementById(`tab${namaTab.charAt(0).toUpperCase() + namaTab.slice(1)}`).classList.add("active");
-}
-
-function perbaruiTabRanking() {
-    const wadah = document.getElementById("rankingList");
-    const urutan = [...appState.pemain].sort((a,b) => b.skor - a.skor);
-    wadah.innerHTML = urutan.map((p, i) => `
-        <div class="list-item">
-            <strong>#${i+1} ${p.nama}</strong><br>
-            Skor: <span style="color:var(--gold-light)">${formatAngka(p.skor)}</span> | Bintang: ⭐ ${p.bintang}
-        </div>
-    `).join("");
-}
-
-function perbaruiTabRiwayat() {
-    const wadah = document.getElementById("historyList");
-    wadah.innerHTML = appState.riwayat.map(r => `
-        <div class="list-item">
-            <small style="color:var(--text-secondary)">${r.waktu}</small><br>
-        ${r.teks}
-        </div>
-    `).join("");
-}
-
-function perbaruiTabPencapaian() {
-    const wadah = document.getElementById("achievementList");
-    const semuaPemain = Object.values(appState.arsipPemain);
-    const pencapaian = [
-        {id: "ngocok", nama: "Tukang Ngocok Kartu", syarat: p => p.skor < 0, deskripsi: "Sempat memiliki skor negatif"},
-        {id: "bakar", nama: "Tukang Bakar", syarat: p => p.membakar >= 3, deskripsi: "Berhasil membakar 3 pemain atau lebih"},
-        {id: "apes", nama: "Hari Apes", syarat: p => p.dibakar >= 5, deskripsi: "Terbakar sebanyak 5 kali atau lebih"},
-        {id: "dewakartu", nama: "Dewa Kartu", syarat: p => p.skorTertinggi >= 500, deskripsi: "Pernah meraih skor 500 atau lebih"},
-        {id: "dewa", nama: "Dewa Dari Segala Dewa", syarat: p => p.bintang > 1, deskripsi: "Mendapatkan lebih dari 1 bintang"},
-        {id: "triple", nama: "Triple Burn", syarat: p => p.tripleBakar > 0, deskripsi: "Berhasil membakar 3 orang sekaligus"}
-    ];
-
-    wadah.innerHTML = pencapaian.map(penc => {
-        const terbuka = semuaPemain.some(p => penc.syarat(p));
-        return `
-            <div class="achievement-item ${terbuka ? "terbuka" : "terkunci"}">
-                <h4 class="judul-pencapaian">${terbuka ? "✅" : "❌"} ${penc.nama}</h4>
-                <p class="deskripsi-pencapaian">${penc.deskripsi}</p>
-            </div>
-        `;
-    }).join("");
-}
-
-function perbaruiTabStatistik() {
-    const wadah = document.getElementById("statistikList");
-    wadah.innerHTML = appState.pemain.map(p => `
-        <div class="statistik-item">
-            <h4 style="color:var(--gold-light);margin-bottom:0.5rem;">${p.nama}</h4>
-            <p>⭐ Bintang: ${p.bintang}</p>
-            <p>🔥 Berhasil Membakar: ${p.membakar} kali</p>
-            <p>💀 Terbakar: ${p.dibakar} kali</p>
-            <p>💣 Triple Burn: ${p.tripleBakar}</p>
-            <p>📈 Skor Tertinggi: ${formatAngka(p.skorTertinggi)}</p>
-        </div>
-    `).join("");
-}
-
-function perbaruiTabArsip() {
-    const wadah = document.getElementById("arsipList");
-    const daftarArsip = Object.values(appState.arsipPemain);
-    wadah.innerHTML = daftarArsip.length === 0
-        ? "<p style='text-align:center;color:var(--text-secondary);'>Belum ada arsip pemain</p>"
-        : daftarArsip.sort((a,b) => b.bintang - a.bintang).map(p => `
-            <div class="list-item">
-                <strong>${p.nama}</strong><br>
-                ⭐ ${p.bintang} | 🔥 Membakar: ${p.membakar} | 💀 Terbakar: ${p.dibakar} | 💣 Triple: ${p.tripleBakar}
-            </div>
-        `).join("");
-}
-
-// ==============================================
-// FUNGSI BANTU LAINNYA
-// ==============================================
 function batalkanLangkahTerakhir() {
-    if (appState.cuplikanSebelumnya.length === 0 || appState.sedangProses) return;
+    if (appState.cuplikanSebelumnya.length === 0) return;
     const cuplikanTerakhir = appState.cuplikanSebelumnya.pop();
     pulihkanDariCuplikan(cuplikanTerakhir);
+    tambahRiwayat("↩️ Membatalkan langkah terakhir");
 }
 
 function tampilkanKonfirmasiReset() {
     tampilkanPopup(`
         <h3>🗑️ Reset Permainan?</h3>
-        <p>Permainan saat ini akan dihapus, tetapi <strong>arsip & statistik pemain akan tetap tersimpan</strong>.</p>
+        <p>Permainan akan dimulai ulang, tapi data bintang & riwayat tetap tersimpan.</p>
     `, () => {
-        const arsipSimpan = JSON.parse(JSON.stringify(appState.arsipPemain));
-        const temaSimpan = appState.tema;
+        const arsipLama = JSON.parse(JSON.stringify(appState.arsipPemain));
+        const temaLama = appState.tema;
 
         appState = {
             halaman: "utama",
-            tema: temaSimpan,
+            tema: temaLama,
             ronde: 1,
             puteran: 0,
             targetKemenangan: APLIKASI.defaultTarget,
             pemain: [
-                { id: "a", nama: "Pemain A", skor: 0, posisiSebelumnya: 1, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0 },
-                { id: "b", nama: "Pemain B", skor: 0, posisiSebelumnya: 2, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0 },
-                { id: "c", nama: "Pemain C", skor: 0, posisiSebelumnya: 3, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0 },
-                { id: "d", nama: "Pemain D", skor: 0, posisiSebelumnya: 4, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0 }
+                { id: "a", nama: "Pemain A", skor: 0, posisiSebelumnya: 1, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false },
+                { id: "b", nama: "Pemain B", skor: 0, posisiSebelumnya: 2, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false },
+                { id: "c", nama: "Pemain C", skor: 0, posisiSebelumnya: 3, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false },
+                { id: "d", nama: "Pemain D", skor: 0, posisiSebelumnya: 4, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false }
             ],
             riwayat: [],
-            arsipPemain: arsipSimpan,
+            arsipPemain: arsipLama,
             cuplikanSebelumnya: [],
             antreanSuara: [],
             sedangBerbicara: false,
@@ -704,32 +595,44 @@ function tampilkanKonfirmasiReset() {
 
         simpanDataKePenyimpanan();
         tampilkanHalamanYangSesuai();
+        tutupPopup();
     });
 }
 
 function tampilkanKonfirmasiRondeBaru() {
     tampilkanPopup(`
         <h3>🏁 Ronde Selesai!</h3>
-        <p>Ada pemain yang mencapai target kemenangan. Siap memulai ronde berikutnya?</p>
-    `, mulaiRondeBaru);
+        <p>Ingin memulai ronde berikutnya?</p>
+    `, () => {
+        mulaiRondeBaru();
+        tutupPopup();
+    });
 }
 
-function tampilkanPopup(isi, fungsiSetuju) {
-    const lapisan = document.getElementById("popupOverlay");
-    const kotak = document.getElementById("popupBox");
-    const konten = document.getElementById("popupContent");
-    const tombolOk = document.getElementById("popupBtn2");
+function tampilkanPesanPeringatan(teks) {
+    tampilkanPopup(`<p style="text-align:center; font-size:16px;">${teks}</p>`, () => {});
+}
 
-    konten.innerHTML = isi;
-    lapisan.classList.add("active");
-    tombolOk.onclick = () => {
+function tampilkanPopup(konten, fungsiOke) {
+    const wadah = document.getElementById("popupOverlay");
+    const isi = document.getElementById("popupContent");
+    const tombolOke = document.getElementById("popupBtn2");
+
+    isi.innerHTML = konten;
+    wadah.classList.add("aktif");
+
+    // Hapus pendengar lama agar tidak menumpuk
+    const pendengarBaru = () => {
         tutupPopup();
-        if (typeof fungsiSetuju === "function") fungsiSetuju();
+        if (typeof fungsiOke === "function") fungsiOke();
+        tombolOke.removeEventListener("click", pendengarBaru);
     };
+
+    tombolOke.addEventListener("click", pendengarBaru);
 }
 
 function tutupPopup() {
-    document.getElementById("popupOverlay").classList.remove("active");
+    document.getElementById("popupOverlay").classList.remove("aktif");
 }
 
 function gantiTema() {
@@ -739,48 +642,90 @@ function gantiTema() {
 }
 
 function terapkanTema() {
-    const tombolTema = document.getElementById("btnTheme");
-    if (appState.tema === "gelap") {
-        document.body.classList.remove("light-mode");
-        tombolTema.textContent = "☀️";
-        tombolTema.title = "Ganti ke Tema Terang";
-    } else {
-        document.body.classList.add("light-mode");
-        tombolTema.textContent = "🌙";
-        tombolTema.title = "Ganti ke Tema Gelap";
-    }
+    document.body.classList.toggle("tema-terang", appState.tema === "terang");
+    const tombol = document.getElementById("btnTheme");
+    tombol.textContent = appState.tema === "gelap" ? "☀️" : "🌙";
+    tombol.title = appState.tema === "gelap" ? "Ganti ke tema terang" : "Ganti ke tema gelap";
 }
 
 function masukLayarPenuh() {
     if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {});
+        document.documentElement.requestFullscreen().catch(err => console.log("Tidak bisa masuk layar penuh:", err));
     } else {
-        document.exitFullscreen().catch(() => {});
+        document.exitFullscreen().catch(err => console.log("Tidak bisa keluar layar penuh:", err));
     }
 }
 
 function ambilTangkapanLayar() {
-    alert("Fitur tangkapan layar siap digunakan setelah aplikasi dipasang!");
+    tampilkanPesanPeringatan("📸 Fitur tangkapan layar sedang dalam pengembangan!");
 }
 
-function tambahAnimasiApi() {
-    const kanvas = document.getElementById("fireCanvas");
-    kanvas.classList.add("active");
-    setTimeout(() => kanvas.classList.remove("active"), 1200);
+function bukaTab(namaTab) {
+    document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("aktif"));
+    document.querySelectorAll(".tab-page").forEach(page => page.classList.remove("aktif"));
+
+    document.querySelector(`.tab-btn[data-tab="${namaTab}"]`).classList.add("aktif");
+    document.getElementById(`tab${namaTab.charAt(0).toUpperCase() + namaTab.slice(1)}`).classList.add("aktif");
 }
 
-function tambahAnimasiBintang() {
-    const kanvas = document.getElementById("starCanvas");
-    kanvas.classList.add("active");
-    setTimeout(() => kanvas.classList.remove("active"), 2500);
+function perbaruiTabRanking() {
+    const wadah = document.getElementById("rankingList");
+    const urutan = [...appState.pemain].sort((a,b) => b.skor - a.skor);
+    wadah.innerHTML = urutan.map((p, i) => `
+        <div class="list-item ${i === 0 ? 'juara' : ''}">
+            <span class="peringkat">${i+1}</span>
+            <span class="nama">${p.nama}</span>
+            <span class="nilai ${p.skor < 0 ? 'negatif' : ''}">${formatAngka(p.skor)}</span>
+        </div>
+    `).join("");
+}
+
+function perbaruiTabRiwayat() {
+    const wadah = document.getElementById("historyList");
+    wadah.innerHTML = appState.riwayat.map(r => `
+        <div class="list-item riwayat">
+            <span class="waktu">${r.waktu}</span>
+            <span class="teks">${r.teks}</span>
+        </div>
+    `).join("");
+}
+
+function perbaruiTabStatistik() {
+    const wadah = document.getElementById("statistikList");
+    wadah.innerHTML = appState.pemain.map(p => `
+        <div class="statistik-kartu">
+            <h4>${p.nama}</h4>
+            <p>⭐ Bintang: ${p.bintang}</p>
+            <p>🔥 Berhasil membakar: ${p.membakar} kali</p>
+            <p>💀 Pernah dibakar: ${p.dibakar} kali</p>
+            <p>💣 Triple bakar: ${p.tripleBakar} kali</p>
+            <p>📈 Nilai tertinggi: ${formatAngka(p.skorTertinggi)}</p>
+        </div>
+    `).join("");
+}
+
+function perbaruiTabPencapaian() {
+    const wadah = document.getElementById("achievementList");
+    const semuaPemain = Object.values(appState.arsipPemain);
+    wadah.innerHTML = semuaPemain.map(p => `
+        <div class="statistik-kartu">
+            <h4>🏆 ${p.nama}</h4>
+            <p>⭐ Total bintang: ${p.bintang}</p>
+            <p>🔥 Total membakar: ${p.membakar}</p>
+            <p>💣 Triple bakar terbanyak: ${p.tripleBakar}</p>
+            <p>📈 Rekor nilai: ${formatAngka(p.skorTertinggi)}</p>
+        </div>
+    `).join("") || "<p>Belum ada data pencapaian</p>";
+}
+
+function perbaruiTabArsip() {
+    perbaruiTabPencapaian();
 }
 
 function daftarkanPWA() {
-    if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-            navigator.serviceWorker.register("sw.js")
-                .then(daftar => console.log("SW terdaftar:", daftar))
-                .catch(err => console.log("SW gagal:", err));
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/service-worker.js').catch(err => console.log("Pendaftaran PWA gagal:", err));
         });
     }
 }
