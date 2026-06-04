@@ -2,7 +2,7 @@
 // KONFIGURASI DASAR & VARIABEL GLOBAL
 // ==============================================
 const APLIKASI = {
-    versi: "1.1.1",
+    versi: "1.1.3",
     nama: "Score Cekih",
     pembuat: "Sadewa Corp",
     defaultTarget: 1000,
@@ -263,7 +263,7 @@ function simpanPuteranSkor() {
     perbaruiSemuaAntarmuka();
     simpanDataKePenyimpanan();
 
-    // ✅ SUDAH DIPERBAIKI SESUAI KOREKSI: HANYA PANGGIL PEMAIN TERENDAH SETIAP PUTERAN
+    // ✅ SESUAI ATURAN: HANYA PANGGIL PEMAIN TERENDAH SETIAP PUTERAN
     jalankanUrutanSuaraSetelahPuteran();
 
     // Kosongkan input
@@ -323,7 +323,7 @@ function prosesKemenangan(pemenang) {
         tambahRiwayat(`⭐ ${pemenang.nama} mendapatkan BINTANG ke-${pemenang.bintang}!`);
 
         setTimeout(() => {
-            // ✅ SUDAH DIPERBAIKI SESUAI ATURAN: INI BARU TEMPATNYA BILANG BANDAR!
+            // ✅ SESUAI ATURAN: HANYA DI SINI BILANG BANDAR
             antrekanSuara(`Silakan bandar kocok kartunya`);
             catatKeArsipPemain();
             simpanDataKePenyimpanan();
@@ -352,7 +352,7 @@ function mulaiRondeBaru() {
 }
 
 // ==============================================
-// SISTEM BAKARAN
+// SISTEM BAKARAN ✨ YANG SUDAH DIPERBAIKI ATURAN SUARANYA
 // ==============================================
 function tampilkanPopupPilihPelaku(idKorban) {
     const korban = appState.pemain.find(p => p.id === idKorban);
@@ -379,6 +379,9 @@ function prosesBakaran(pelaku, korban) {
     const cuplikanSebelum = buatCuplikanPenuh();
     appState.cuplikanSebelumnya.push(cuplikanSebelum);
 
+    // Simpan skor SEBELUM dibakar untuk dicek nanti
+    const skorAwalKorban = korban.skor;
+
     // Tambah statistik
     pelaku.membakar++;
     korban.dibakar++;
@@ -391,14 +394,19 @@ function prosesBakaran(pelaku, korban) {
         tambahRiwayat(`💣 TRIPLE BURN - ${pelaku.nama} membakar 3 pemain sekaligus!`);
     }
 
-    // Langkah-langkah sesuai spesifikasi
+    // Langkah 1: Umumkan pembakaran
     antrekanSuara(`${pelaku.nama} membakar ${korban.nama}`);
 
     setTimeout(() => {
-        mainkanAudio("audioNol");
-        tambahAnimasiApi();
+        // Langkah 2 & 3: ✅ ATURAN BARU SESUAI MAUMU!
+        // HANYA mainkan suara & animasi NOL kalau skornya POSITIF / DI ATAS NOL SEBELUM DIBAKAR
+        if (skorAwalKorban > 0) {
+            mainkanAudio("audioNol");
+            tambahAnimasiApi();
+        }
 
         setTimeout(() => {
+            // Langkah 4: Tetap jadikan skornya 0 (aturan tetap sama)
             korban.skor = 0;
             korban.dapatTerbakar = false;
             tambahRiwayat(`🔥 ${pelaku.nama} membakar ${korban.nama}!`);
@@ -408,7 +416,7 @@ function prosesBakaran(pelaku, korban) {
             catatKeArsipPemain();
             simpanDataKePenyimpanan();
             appState.sedangProses = false;
-        }, 1200);
+        }, skorAwalKorban > 0 ? 1200 : 200); // Kalau minus lebih cepat selesai
     }, 800);
 }
 
@@ -422,6 +430,7 @@ function perbaruiSemuaAntarmuka() {
     document.getElementById("btnUndo").disabled = appState.cuplikanSebelumnya.length === 0;
 
     perbaruiKartuPemain();
+    perbaruiKolomInputPoin(); // ✅ Kolom ikut ganti nama
     perbaruiTabRanking();
     perbaruiTabRiwayat();
     perbaruiTabPencapaian();
@@ -465,6 +474,13 @@ function perbaruiKartuPemain() {
     document.querySelectorAll(".btn-bakar").forEach(tombol => {
         tombol.addEventListener("click", () => tampilkanPopupPilihPelaku(tombol.dataset.id));
     });
+}
+
+function perbaruiKolomInputPoin() {
+    document.querySelector("label[for='skorA']").textContent = appState.pemain[0].nama;
+    document.querySelector("label[for='skorB']").textContent = appState.pemain[1].nama;
+    document.querySelector("label[for='skorC']").textContent = appState.pemain[2].nama;
+    document.querySelector("label[for='skorD']").textContent = appState.pemain[3].nama;
 }
 
 function tampilkanEditNama(idPemain) {
@@ -526,22 +542,18 @@ function lanjutkanAntreanSuara() {
 }
 
 function jalankanUrutanSuaraSetelahPuteran() {
-    // ✅ SESUAI ATURAN ASLI SETELAH KOREKSI:
-    // 1. Cari pemain yang nilainya paling rendah (minus atau paling kecil)
+    // 1. Cari pemain yang nilainya paling rendah
     const pemainTerendah = cariPemainSkorTerendah();
 
-    // 2. Langsung panggil dia buat ngocok, TANPA BILANG BANDAR DULU!
+    // 2. Panggil dia buat ngocok
     antrekanSuara(`Silakan ${pemainTerendah.nama} kocok kartunya`);
 
     setTimeout(() => {
-        // 3. Baru bacakan semua total poin pemain
+        // 3. Bacakan semua total poin
         appState.pemain.forEach(p => {
             const angkaDalamBahasa = numberToBahasaIndonesia(p.skor);
             antrekanSuara(`${p.nama} total poin ${angkaDalamBahasa}`);
         });
-
-        // 4. Suara nol tetap di akhir jika dibutuhkan
-        setTimeout(() => mainkanAudio("audioNol"), 2500);
     }, 1200);
 }
 
@@ -749,7 +761,7 @@ function tampilkanPopup(isi, fungsiSetuju) {
 }
 
 function tutupPopup() {
-    document.getElementById("popupOverlay").classList.remove("active");
+    document.getElementById("popupOverlay").class.remove("active");
 }
 
 function gantiTema() {
