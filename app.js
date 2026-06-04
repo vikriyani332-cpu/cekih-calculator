@@ -1,731 +1,706 @@
-// ==============================================
-// KONFIGURASI DASAR & VARIABEL GLOBAL
-// ==============================================
-const APLIKASI = {
-    versi: "1.1.7",
-    nama: "Score Cekih",
-    pembuat: "Sadewa Corp",
-    defaultTarget: 1000,
-    maxPerPuteran: 1000,
-    localStorageKey: "score_cekih_data"
-};
-
-let appState = {
-    halaman: "loading",
-    tema: "gelap",
+// State Management
+const state = {
+    players: [],
     ronde: 1,
-    puteran: 0,
-    targetKemenangan: APLIKASI.defaultTarget,
-    pemain: [
-        { id: "a", nama: "Pemain A", skor: 0, posisiSebelumnya: 1, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false },
-        { id: "b", nama: "Pemain B", skor: 0, posisiSebelumnya: 2, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false },
-        { id: "c", nama: "Pemain C", skor: 0, posisiSebelumnya: 3, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false },
-        { id: "d", nama: "Pemain D", skor: 0, posisiSebelumnya: 4, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false }
-    ],
-    riwayat: [],
-    arsipPemain: {},
-    cuplikanSebelumnya: [],
-    antreanSuara: [],
-    sedangBerbicara: false,
-    sedangProses: false
+    putaran: 0,
+    targetScore: 1000,
+    history: [],
+    archives: [],
+    stats: {},
+    snapshots: [], // For Undo
+    isProcessing: false
 };
 
-// ==============================================
-// INISIALISASI AWAL
-// ==============================================
-window.addEventListener("load", () => {
-    muatDataDariPenyimpanan();
-    tampilkanLayarMuat();
-    inisialisasiElemenAntarmuka();
-    inisialisasiSuara();
-    daftarkanPWA();
-    setInterval(lanjutkanAntreanSuara, 100);
-    setTimeout(() => selesaikanLayarMuat(), 1800);
+// DOM Elements
+const elements = {
+    loadingScreen: document.getElementById('loading-screen'),
+    appContainer: document.getElementById('app-container'),
+    setupScreen: document.getElementById('setup-screen'),
+    gameScreen: document.getElementById('game-screen'),
+    playersContainer: document.getElementById('players-container'),
+    rankingList: document.getElementById('ranking-list'),
+    historyList: document.getElementById('history-list'),
+    statsContent: document.getElementById('stats-content'),
+    archiveList: document.getElementById('archive-list'),
+    rondeDisplay: document.getElementById('ronde-display'),
+    putaranDisplay: document.getElementById('putaran-display'),
+    targetDisplay: document.getElementById('target-display'),
+    modalBurnConfirm: document.getElementById('modal-burn-confirm'),
+    modalResetConfirm: document.getElementById('modal-reset-confirm'),
+    burnVictimName: document.getElementById('burn-victim-name'),
+    burnPerpetratorList: document.getElementById('burn-perpetrator-list'),
+    fireOverlay: document.getElementById('fire-overlay'),
+    starOverlay: document.getElementById('star-overlay')
+};
+
+// Audio Context
+let audioCtx;
+const sounds = {
+    godofgambler: new Audio('godofgambler.wav'),
+    dimulaidari0: new Audio('dimulaidari0.wav')
+};
+
+// Initialize
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        elements.loadingScreen.style.opacity = '0';
+        setTimeout(() => {
+            elements.loadingScreen.classList.add('hidden');
+            elements.appContainer.classList.remove('hidden');
+            loadData();
+            initGame();
+        }, 500);
+    }, 1500);
 });
 
-// ==============================================
-// PENYIMPANAN DATA
-// ==============================================
-function simpanDataKePenyimpanan() {
-    try {
-        const dataUntukDisimpan = {
-            tema: appState.tema,
-            ronde: appState.ronde,
-            puteran: appState.puteran,
-            targetKemenangan: appState.targetKemenangan,
-            pemain: appState.pemain.map(p => ({ ...p })),
-            riwayat: appState.riwayat.map(r => ({ ...r })),
-            arsipPemain: JSON.parse(JSON.stringify(appState.arsipPemain))
-        };
-        localStorage.setItem(APLIKASI.localStorageKey, JSON.stringify(dataUntukDisimpan));
-    } catch (kesalahan) {
-        console.error("Gagal menyimpan data:", kesalahan);
+function initGame() {
+    setupEventListeners();
+    renderSetupInputs();
+    updateUI();
+}
+
+function setupEventListeners() {
+    // Setup Screen
+    document.getElementById('btn-start-game').addEventListener('click', startGame);
+
+    // Game Actions
+    document.getElementById('btn-save-turn').addEventListener('click', saveTurn);
+    document.getElementById('btn-undo').addEventListener('click', undo);
+    document.getElementById('btn-reset-game').addEventListener('click', () => showModal('modal-reset-confirm'));
+    document.getElementById('btn-confirm-reset').addEventListener('click', resetGame);
+    document.getElementById('btn-cancel-reset').addEventListener('click', hideModals);
+    document.getElementById('btn-cancel-burn').addEventListener('click', hideModals);
+    
+    // Tabs
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => switchTab(e.target.dataset.tab));
+    });
+
+    // Utilities
+    document.getElementById('btn-screenshot').addEventListener('click', takeScreenshot);
+    document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen);
+}
+
+function renderSetupInputs() {
+    const inputs = ['p1-name', 'p2-name', 'p3-name', 'p4-name'];
+    inputs.forEach((id, index) => {
+        const el = document.getElementById(id);
+        if (state.players[index]) {
+            el.value = state.players[index].name;
+        }
+    });
+    document.getElementById('target-score').value = state.targetScore;
+}
+
+function startGame() {
+    const names = [
+        document.getElementById('p1-name').value || 'Pemain A',
+        document.getElementById('p2-name').value || 'Pemain B',
+        document.getElementById('p3-name').value || 'Pemain C',
+        document.getElementById('p4-name').value || 'Pemain D'
+    ];
+    
+    state.targetScore = parseInt(document.getElementById('target-score').value);
+    
+    // Initialize players if new game, or update names if continuing
+    if (state.players.length === 0) {
+        state.players = names.map((name, i) => ({
+            id: i,
+            name: name,
+            score: 0,
+            stars: 0,
+            burned: false
+        }));
+    } else {
+        state.players.forEach((p, i) => {
+            p.name = names[i];
+        });
+    }
+
+    state.ronde = 1;
+    state.putaran = 0;
+    state.history = [];
+    
+    saveData();
+    showScreen('game');
+    updateUI();
+    speak("Permainan dimulai");
+}
+
+function showScreen(screenName) {
+    elements.setupScreen.classList.add('hidden');
+    elements.gameScreen.classList.add('hidden');
+    
+    if (screenName === 'setup') {
+        elements.setupScreen.classList.remove('hidden');
+    } else {
+        elements.gameScreen.classList.remove('hidden');
     }
 }
 
-function muatDataDariPenyimpanan() {
-    try {
-        const dataTersimpan = localStorage.getItem(APLIKASI.localStorageKey);
-        if (!dataTersimpan) return;
+function updateUI() {
+    elements.rondeDisplay.textContent = `RONDE ${state.ronde}`;
+    elements.putaranDisplay.textContent = `PUTERAN ${state.putaran}`;
+    elements.targetDisplay.textContent = `TARGET: ${state.targetScore}`;
 
-        const dataTerbaca = JSON.parse(dataTersimpan);
-        if (dataTerbaca.tema) appState.tema = dataTerbaca.tema;
-        if (dataTerbaca.ronde) appState.ronde = dataTerbaca.ronde;
-        if (dataTerbaca.puteran) appState.puteran = dataTerbaca.puteran;
-        if (dataTerbaca.targetKemenangan) appState.targetKemenangan = dataTerbaca.targetKemenangan;
-        if (dataTerbaca.pemain) appState.pemain = dataTerbaca.pemain;
-        if (dataTerbaca.riwayat) appState.riwayat = dataTerbaca.riwayat;
-        if (dataTerbaca.arsipPemain) appState.arsipPemain = dataTerbaca.arsipPemain;
+    renderPlayerCards();
+    renderRanking();
+    renderHistory();
+    renderStats();
+    renderArchive();
+    
+    // Update input labels
+    state.players.forEach((p, i) => {
+        document.getElementById(`label-p${i+1}`).textContent = p.name;
+    });
+}
 
-        terapkanTema();
-    } catch (kesalahan) {
-        console.error("Gagal memuat data:", kesalahan);
+function renderPlayerCards() {
+    elements.playersContainer.innerHTML = '';
+    
+    state.players.forEach(player => {
+        const card = document.createElement('div');
+        card.className = `player-card ${player.score < 0 ? 'negative' : ''}`;
+        
+        const isCandidate = isBurnCandidate(player);
+        const canBurnBtn = player.score > 0 && isCandidate;
+        
+        let starsHtml = '';
+        for(let i=0; i<player.stars; i++) starsHtml += '⭐';
+
+        card.innerHTML = `
+            <div class="player-name">
+                ${player.name}
+                <button class="edit-name-btn" onclick="editName(${player.id})">✏️</button>
+            </div>
+            <div class="player-stars">${starsHtml}</div>
+            <div class="player-score">${player.score}</div>
+            ${player.score < 0 ? '<div class="minus-icon">👎</div>' : ''}
+            <button class="burn-btn ${canBurnBtn ? 'unlocked' : ''}" 
+                    onclick="initiateBurn(${player.id})" 
+                    ${!canBurnBtn ? 'disabled' : ''}>
+                🔥 TERBAKAR
+            </button>
+        `;
+        elements.playersContainer.appendChild(card);
+    });
+}
+
+function isBurnCandidate(player) {
+    if (player.score <= 0) return false;
+    
+    // Check if anyone was below them and now is above or equal
+    // Logic: If I am candidate, it means someone overtook me.
+    // Actually, prompt says: "If player previously below successfully passes higher player, then higher becomes candidate."
+    // So we need to check history of positions.
+    // Simplified: We store "previousRank" or check against snapshot.
+    // Better approach: Check current rankings vs previous round's final rankings?
+    // Prompt: "Aplikasi harus menyimpan riwayat posisi pemain."
+    
+    // Let's use a simpler logic based on the prompt's example:
+    // A=180, B=180 (B came from below). B passes A -> A is candidate.
+    // We need to track who is "chasing".
+    
+    // For this implementation, we'll mark candidates during saveTurn logic
+    // and store it in player object temporarily or calculate dynamically.
+    // To keep it robust, we'll add a 'isCandidate' property to player state during calculation.
+    
+    return player.isCandidate || false;
+}
+
+function saveTurn() {
+    if (state.isProcessing) return;
+    
+    const scores = [
+        parseInt(document.getElementById('input-p1').value) || 0,
+        parseInt(document.getElementById('input-p2').value) || 0,
+        parseInt(document.getElementById('input-p3').value) || 0,
+        parseInt(document.getElementById('input-p4').value) || 0
+    ];
+
+    // Validate max input
+    if (scores.some(s => s > 1000)) {
+        alert("Nilai maksimal per puteran adalah 1000");
+        return;
+    }
+
+    // Save Snapshot for Undo
+    saveSnapshot();
+
+    state.putaran++;
+    
+    // Update Scores
+    let roundWinner = null;
+    
+    // Calculate new scores and check winners
+    state.players.forEach((p, i) => {
+        p.score += scores[i];
+        
+        // Check Win
+        if (p.score >= state.targetScore && p.stars === 0) {
+            p.stars++;
+            roundWinner = p;
+        }
+    });
+
+    // Determine Burn Candidates
+    determineBurnCandidates();
+
+    // Add to History
+    const historyEntry = {
+        type: 'turn',
+        ronde: state.ronde,
+        putaran: state.putaran,
+        scores: scores,
+        totals: state.players.map(p => p.score)
+    };
+    state.history.unshift(historyEntry);
+
+    // Clear Inputs
+    document.querySelectorAll('.score-inputs input').forEach(input => input.value = '');
+
+    saveData();
+    updateUI();
+
+    // TTS Sequence
+    if (roundWinner) {
+        handleWin(roundWinner);
+    } else {
+        // Normal Turn TTS
+        const lowestPlayer = getLowestPlayer();
+        const queue = [
+            `Silakan ${lowestPlayer.name} kocok kartunya`,
+            ...state.players.map(p => `${p.name} total poin ${numberToBahasaIndonesia(p.score)}`)
+        ];
+        speakQueue(queue);
     }
 }
 
-function buatCuplikanPenuh() {
-    return JSON.parse(JSON.stringify({
-        ronde: appState.ronde,
-        puteran: appState.puteran,
-        pemain: appState.pemain,
-        riwayat: appState.riwayat
+function determineBurnCandidates() {
+    // Reset candidates
+    state.players.forEach(p => p.isCandidate = false);
+
+    // Sort by score desc
+    const sorted = [...state.players].sort((a, b) => b.score - a.score);
+    
+    // Check overtakes
+    // We need previous state to compare. Since we don't store full history of ranks easily,
+    // we can assume: If a player with lower score in previous turn (stored in snapshot?) passed someone.
+    // Simpler: Compare current rank with rank before this turn.
+    
+    const prevSnapshot = state.snapshots[state.snapshots.length - 1];
+    if (!prevSnapshot) return;
+
+    const prevPlayers = prevSnapshot.players;
+
+    // For each pair
+    for (let i = 0; i < state.players.length; i++) {
+        for (let j = i + 1; j < state.players.length; j++) {
+            const currentHigher = state.players[i]; // Currently higher score
+            const currentLower = state.players[j];  // Currently lower score
+            
+            // Find their previous scores
+            const prevHigher = prevPlayers.find(p => p.id === currentHigher.id);
+            const prevLower = prevPlayers.find(p => p.id === currentLower.id);
+
+            if (prevHigher && prevLower) {
+                // If previously Lower was actually higher or equal, and now is lower? No.
+                // Condition: "Player previously below successfully passes player higher"
+                // Means: Prev: Lower < Higher. Now: Lower > Higher.
+                // Then Higher becomes candidate.
+                
+                if (prevLower.score < prevHigher.score && currentLower.score > currentHigher.score) {
+                    currentHigher.isCandidate = true;
+                }
+                
+                // Condition: "If player previously below successfully equals score"
+                // "B still considered coming from below... status doesn't disappear"
+                // This implies if they are equal, and B came from below, B is still "chasing".
+                // But burn happens when passing.
+                
+                // What if they become equal?
+                if (prevLower.score < prevHigher.score && currentLower.score === currentHigher.score) {
+                    // They are tied. The one who was higher is now "caught".
+                    // Prompt says: "If A=180, B=180 (B came from below)... B still considered coming from below."
+                    // It doesn't say A is burnable yet. Only when passed.
+                }
+            }
+        }
+    }
+}
+
+function handleWin(player) {
+    state.isProcessing = true;
+    
+    // TTS & Audio & Animation
+    speakQueue([
+        `Selamat kepada ${player.name} mendapatkan bintang satu`
+    ], () => {
+        playSound('godofgambler');
+        showStarAnimation();
+        
+        setTimeout(() => {
+            speakQueue(["Silakan bandar kocok kartunya"], () => {
+                endRonde();
+            });
+        }, 2000);
+    });
+}
+
+function endRonde() {
+    state.isProcessing = false;
+    // Auto finish ronde? Prompt says "Ronde otomatis selesai".
+    // Then show setup for new ronde.
+    
+    setTimeout(() => {
+        alert(`Ronde ${state.ronde} Selesai! Pemenang: ${state.players.find(p=>p.stars>0)?.name || '???'}`);
+        state.ronde++;
+        state.putaran = 0;
+        // Reset scores for new ronde? Usually yes in card games like Cekih.
+        // Prompt doesn't explicitly say reset scores, but "Ronde Baru" implies fresh game.
+        // However, "Statistik pemain harus disimpan berdasarkan nama... Jika Yoga bermain lagi pada ronde berikutnya: Statistik Yoga harus tetap digunakan."
+        // This refers to global stats (burns, etc), not round score.
+        // Standard Cekih: Scores reset per round.
+        state.players.forEach(p => {
+            p.score = 0;
+            p.isCandidate = false;
+        });
+        
+        saveData();
+        showScreen('setup');
+        renderSetupInputs();
+    }, 1000);
+}
+
+function initiateBurn(victimId) {
+    const victim = state.players.find(p => p.id === victimId);
+    if (!victim) return;
+
+    elements.burnVictimName.textContent = victim.name;
+    elements.burnPerpetratorList.innerHTML = '';
+
+    state.players.forEach(p => {
+        if (p.id !== victimId) {
+            const btn = document.createElement('button');
+            btn.className = 'modal-option-btn';
+            btn.textContent = p.name;
+            btn.onclick = () => executeBurn(p, victim);
+            elements.burnPerpetratorList.appendChild(btn);
+        }
+    });
+
+    showModal('modal-burn-confirm');
+}
+
+function executeBurn(perpetrator, victim) {
+    hideModals();
+    saveSnapshot();
+
+    // Update Stats
+    updatePlayerStat(perpetrator.name, 'burns', 1);
+    updatePlayerStat(victim.name, 'burned', 1);
+
+    // Check Triple Burn
+    const currentTurnHistory = state.history[0];
+    if (currentTurnHistory && currentTurnHistory.type === 'turn') {
+        // Count burns in this turn? 
+        // We need to track burns per turn separately in state.
+        // Let's add a temporary counter in state for current turn burns.
+        state.currentTurnBurns = (state.currentTurnBurns || 0) + 1;
+        
+        if (state.currentTurnBurns === 3) {
+            updatePlayerStat(perpetrator.name, 'tripleBurn', 1);
+            state.history.unshift({ type: 'triple', perpetrator: perpetrator.name });
+            speakQueue(["Triple Burn"]);
+        }
+    }
+
+    // Add to History
+    state.history.unshift({
+        type: 'burn',
+        perpetrator: perpetrator.name,
+        victim: victim.name,
+        ronde: state.ronde,
+        putaran: state.putaran
+    });
+
+    // Animation & Audio Sequence
+    showFireAnimation(() => {
+        // After animation
+        victim.score = 0;
+        victim.isCandidate = false;
+        
+        speakQueue([`${perpetrator.name} membakar ${victim.name}`], () => {
+            playSound('dimulaidari0');
+            saveData();
+            updateUI();
+        });
+    });
+}
+
+function showFireAnimation(callback) {
+    elements.fireOverlay.classList.remove('hidden');
+    setTimeout(() => {
+        elements.fireOverlay.classList.add('hidden');
+        if (callback) callback();
+    }, 2000);
+}
+
+function showStarAnimation() {
+    elements.starOverlay.classList.remove('hidden');
+    setTimeout(() => {
+        elements.starOverlay.classList.add('hidden');
+    }, 2000);
+}
+
+function getLowestPlayer() {
+    // Sort ascending
+    const sorted = [...state.players].sort((a, b) => a.score - b.score);
+    return sorted[0];
+}
+
+function undo() {
+    if (state.snapshots.length === 0) {
+        alert("Tidak ada aksi untuk di-undo");
+        return;
+    }
+    
+    const lastState = state.snapshots.pop();
+    // Restore deep copy
+    state.players = JSON.parse(lastState.players);
+    state.ronde = lastState.ronde;
+    state.putaran = lastState.putaran;
+    state.history = JSON.parse(lastState.history);
+    state.currentTurnBurns = lastState.currentTurnBurns;
+    
+    saveData();
+    updateUI();
+    speak("Undo berhasil");
+}
+
+function saveSnapshot() {
+    const snapshot = {
+        players: JSON.stringify(state.players),
+        ronde: state.ronde,
+        putaran: state.putaran,
+        history: JSON.stringify(state.history),
+        currentTurnBurns: state.currentTurnBurns || 0
+    };
+    state.snapshots.push(snapshot);
+    // Limit snapshots
+    if (state.snapshots.length > 10) state.snapshots.shift();
+}
+
+function resetGame() {
+    hideModals();
+    state.ronde = 1;
+    state.putaran = 0;
+    state.history = [];
+    state.players.forEach(p => {
+        p.score = 0;
+        p.stars = 0;
+        p.isCandidate = false;
+    });
+    state.snapshots = [];
+    state.currentTurnBurns = 0;
+    
+    saveData();
+    updateUI();
+    showScreen('setup');
+    speak("Permainan direset");
+}
+
+// Stats & Archive
+function updatePlayerStat(name, key, amount) {
+    if (!state.stats[name]) {
+        state.stats[name] = { stars: 0, burns: 0, burned: 0, tripleBurn: 0, highestScore: 0 };
+    }
+    state.stats[name][key] += amount;
+    
+    // Update Highest Score
+    const player = state.players.find(p => p.name === name);
+    if (player && player.score > state.stats[name].highestScore) {
+        state.stats[name].highestScore = player.score;
+    }
+    
+    // Add to Archive if not exists
+    if (!state.archives.includes(name)) {
+        state.archives.push(name);
+    }
+}
+
+function renderStats() {
+    elements.statsContent.innerHTML = '';
+    Object.keys(state.stats).forEach(name => {
+        const s = state.stats[name];
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.style.marginBottom = '10px';
+        div.innerHTML = `
+            <h4>${name}</h4>
+            <p>⭐ Stars: ${s.stars}</p>
+            <p>🔥 Burns: ${s.burns}</p>
+            <p>💀 Burned: ${s.burned}</p>
+            <p>💣 Triple Burn: ${s.tripleBurn}</p>
+            <p>🏆 High Score: ${s.highestScore}</p>
+        `;
+        elements.statsContent.appendChild(div);
+    });
+}
+
+function renderArchive() {
+    elements.archiveList.innerHTML = '';
+    state.archives.forEach(name => {
+        const li = document.createElement('li');
+        li.textContent = name;
+        elements.archiveList.appendChild(li);
+    });
+}
+
+function renderRanking() {
+    elements.rankingList.innerHTML = '';
+    const sorted = [...state.players].sort((a, b) => b.score - a.score);
+    sorted.forEach((p, index) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>#${index + 1} ${p.name}</span> <span>${p.score}</span>`;
+        elements.rankingList.appendChild(li);
+    });
+}
+
+function renderHistory() {
+    elements.historyList.innerHTML = '';
+    state.history.forEach(h => {
+        const li = document.createElement('li');
+        if (h.type === 'burn') {
+            li.className = 'history-item burn';
+            li.textContent = `🔥 ${h.perpetrator} membakar ${h.victim}`;
+        } else if (h.type === 'triple') {
+            li.className = 'history-item triple';
+            li.textContent = `💣 TRIPLE BURN - ${h.perpetrator}`;
+        } else {
+            li.className = 'history-item';
+            li.textContent = `R${h.ronde} P${h.putaran}: ${h.totals.join(', ')}`;
+        }
+        elements.historyList.appendChild(li);
+    });
+}
+
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    
+    document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add('active');
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+}
+
+// Utilities
+function editName(id) {
+    const player = state.players.find(p => p.id === id);
+    const newName = prompt("Edit Nama:", player.name);
+    if (newName && newName.trim() !== "") {
+        // If name changes, stats are reset for new name as per prompt
+        player.name = newName.trim();
+        saveData();
+        updateUI();
+    }
+}
+
+function showModal(id) {
+    document.getElementById(id).classList.remove('hidden');
+}
+
+function hideModals() {
+    document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+}
+
+function takeScreenshot() {
+    alert("Fitur Screenshot: Gunakan tombol Power + Volume Down pada Android Anda untuk mengambil tangkapan layar terbaik.");
+}
+
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.log(`Error attempting to enable full-screen mode: ${err.message}`);
+        });
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        }
+    }
+}
+
+// TTS & Audio
+function speak(text) {
+    if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'id-ID';
+        window.speechSynthesis.speak(utterance);
+    }
+}
+
+function speakQueue(texts, callback) {
+    if (!texts || texts.length === 0) {
+        if (callback) callback();
+        return;
+    }
+    
+    const text = texts.shift();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'id-ID';
+    
+    utterance.onend = () => {
+        speakQueue(texts, callback);
+    };
+    
+    window.speechSynthesis.speak(utterance);
+}
+
+function playSound(soundName) {
+    const sound = sounds[soundName];
+    if (sound) {
+        sound.currentTime = 0;
+        sound.play().catch(e => console.log("Audio play failed", e));
+    }
+}
+
+function numberToBahasaIndonesia(num) {
+    if (num === 0) return "nol";
+    if (num < 0) return "minus " + numberToBahasaIndonesia(Math.abs(num));
+    
+    const satuan = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
+    
+    if (num < 12) return satuan[num];
+    if (num < 20) return satuan[num - 10] + " belas";
+    if (num < 100) return satuan[Math.floor(num / 10)] + " puluh " + satuan[num % 10];
+    if (num < 200) return "seratus " + numberToBahasaIndonesia(num - 100);
+    if (num < 1000) return satuan[Math.floor(num / 100)] + " ratus " + numberToBahasaIndonesia(num % 100);
+    if (num < 2000) return "seribu " + numberToBahasaIndonesia(num - 1000);
+    return num.toString(); // Fallback for large numbers
+}
+
+// LocalStorage
+function saveData() {
+    localStorage.setItem('scoreCekihData', JSON.stringify({
+        players: state.players,
+        ronde: state.ronde,
+        putaran: state.putaran,
+        targetScore: state.targetScore,
+        history: state.history,
+        stats: state.stats,
+        archives: state.archives
     }));
 }
 
-function pulihkanDariCuplikan(cuplikan) {
-    if (!cuplikan) return;
-    appState.ronde = cuplikan.ronde;
-    appState.puteran = cuplikan.puteran;
-    appState.pemain = cuplikan.pemain;
-    appState.riwayat = cuplikan.riwayat;
-    perbaruiSemuaAntarmuka();
-    simpanDataKePenyimpanan();
-}
-
-// ==============================================
-// LAYAR MUAT AWAL
-// ==============================================
-function tampilkanLayarMuat() {
-    const layarMuat = document.getElementById("loadingScreen");
-    layarMuat.classList.add("active");
-    let kemajuan = 0;
-    const animasi = setInterval(() => {
-        kemajuan += Math.random() * 12;
-        if (kemajuan > 95) kemajuan = 95;
-        document.getElementById("loadingBar").style.width = kemajuan + "%";
-    }, 80);
-    setTimeout(() => clearInterval(animasi), 1600);
-}
-
-function selesaikanLayarMuat() {
-    document.getElementById("loadingBar").style.width = "100%";
-    setTimeout(() => {
-        const layarMuat = document.getElementById("loadingScreen");
-        layarMuat.style.opacity = "0";
-        setTimeout(() => {
-            layarMuat.classList.remove("active");
-            layarMuat.style.opacity = "";
-            appState.halaman = "utama";
-            tampilkanHalamanYangSesuai();
-        }, 600);
-    }, 300);
-}
-
-// ==============================================
-// INISIALISASI ELEMEN & ACARA
-// ==============================================
-function inisialisasiElemenAntarmuka() {
-    document.getElementById("btnTheme").addEventListener("click", gantiTema);
-    document.getElementById("btnFullscreen").addEventListener("click", masukLayarPenuh);
-    document.getElementById("btnScreenshot").addEventListener("click", ambilTangkapanLayar);
-    document.getElementById("btnUndo").addEventListener("click", batalkanLangkahTerakhir);
-    document.getElementById("btnResetGame").addEventListener("click", tampilkanKonfirmasiReset);
-    document.getElementById("btnMulaiPermainan").addEventListener("click", mulaiPermainanBaru);
-    document.getElementById("btnSimpanPuteran").addEventListener("click", simpanPuteranSkor);
-
-    document.querySelectorAll(".tab-btn").forEach(tombol => {
-        tombol.addEventListener("click", () => bukaTab(tombol.dataset.tab));
-    });
-
-    document.getElementById("popupBtn1").addEventListener("click", tutupPopup);
-    document.getElementById("popupBtn2").addEventListener("click", tutupPopup);
-}
-
-function tampilkanHalamanYangSesuai() {
-    const halamanPengaturan = document.getElementById("setupPage");
-    const halamanPermainan = document.getElementById("gamePage");
-
-    if (appState.puteran === 0 && appState.ronde === 1 && appState.pemain.every(p => p.nama.startsWith("Pemain "))) {
-        halamanPengaturan.classList.add("active");
-        halamanPermainan.classList.remove("active");
-    } else {
-        halamanPengaturan.classList.remove("active");
-        halamanPermainan.classList.add("active");
-        perbaruiSemuaAntarmuka();
-    }
-}
-
-function mulaiPermainanBaru() {
-    const namaA = document.getElementById("namaA").value.trim() || "Pemain A";
-    const namaB = document.getElementById("namaB").value.trim() || "Pemain B";
-    const namaC = document.getElementById("namaC").value.trim() || "Pemain C";
-    const namaD = document.getElementById("namaD").value.trim() || "Pemain D";
-    const target = parseInt(document.getElementById("targetMenang").value) || APLIKASI.defaultTarget;
-
-    appState.pemain[0].nama = namaA;
-    appState.pemain[1].nama = namaB;
-    appState.pemain[2].nama = namaC;
-    appState.pemain[3].nama = namaD;
-    appState.targetKemenangan = target;
-    appState.ronde = 1;
-    appState.puteran = 0;
-
-    catatKeArsipPemain();
-    simpanDataKePenyimpanan();
-    tampilkanHalamanYangSesuai();
-}
-
-function catatKeArsipPemain() {
-    appState.pemain.forEach(pemain => {
-        if (!appState.arsipPemain[pemain.nama]) {
-            appState.arsipPemain[pemain.nama] = {
-                nama: pemain.nama,
-                bintang: 0,
-                membakar: 0,
-                dibakar: 0,
-                tripleBakar: 0,
-                skorTertinggi: 0
-            };
-        }
-        const arsip = appState.arsipPemain[pemain.nama];
-        if (pemain.bintang > arsip.bintang) arsip.bintang = pemain.bintang;
-        if (pemain.membakar > arsip.membakar) arsip.membakar = pemain.membakar;
-        if (pemain.dibakar > arsip.dibakar) arsip.dibakar = pemain.dibakar;
-        if (pemain.tripleBakar > arsip.tripleBakar) arsip.tripleBakar = pemain.tripleBakar;
-        if (pemain.skorTertinggi > arsip.skorTertinggi) arsip.skorTertinggi = pemain.skorTertinggi;
-    });
-}
-
-// ==============================================
-// MANAJEMEN SKOR & PUTERAN
-// ==============================================
-function simpanPuteranSkor() {
-    if (appState.sedangProses) return;
-    appState.sedangProses = true;
-
-    const cuplikanSebelum = buatCuplikanPenuh();
-    appState.cuplikanSebelumnya.push(cuplikanSebelum);
-    if (appState.cuplikanSebelumnya.length > 20) appState.cuplikanSebelumnya.shift();
-
-    const nilaiA = parseInt(document.getElementById("skorA").value) || 0;
-    const nilaiB = parseInt(document.getElementById("skorB").value) || 0;
-    const nilaiC = parseInt(document.getElementById("skorC").value) || 0;
-    const nilaiD = parseInt(document.getElementById("skorD").value) || 0;
-
-    const batasi = nilai => Math.max(-APLIKASI.maxPerPuteran, Math.min(APLIKASI.maxPerPuteran, nilai));
-    const tambahan = [batasi(nilaiA), batasi(nilaiB), batasi(nilaiC), batasi(nilaiD)];
-
-    simpanPosisiSebelumnya();
-
-    appState.pemain.forEach((pemain, indeks) => {
-        pemain.skor += tambahan[indeks];
-        if (pemain.skor > pemain.skorTertinggi) pemain.skorTertinggi = pemain.skor;
-    });
-
-    appState.puteran++;
-    tambahRiwayat(`📝 Puteran ${appState.puteran}: ${appState.pemain.map((p,i) => `${p.nama} +${tambahan[i]}`).join(", ")}`);
-
-    // ✅ CEK BAKARAN SESUAI ATURAN BARU
-    cekKandidatTerbakar();
-
-    const pemenang = cekPemenangRonde();
-    if (pemenang) {
-        prosesKemenangan(pemenang);
-        return;
-    }
-
-    urutkanPemain();
-    perbaruiSemuaAntarmuka();
-    simpanDataKePenyimpanan();
-
-    jalankanUrutanSuaraSetelahPuteran();
-
-    document.querySelectorAll(".input-point").forEach(input => input.value = "");
-    appState.sedangProses = false;
-}
-
-function simpanPosisiSebelumnya() {
-    const urutanSebelum = [...appState.pemain].sort((a,b) => b.skor - a.skor);
-    urutanSebelum.forEach((pemain, indeks) => {
-        const pemainAsli = appState.pemain.find(p => p.id === pemain.id);
-        if (pemainAsli) pemainAsli.posisiSebelumnya = indeks + 1;
-    });
-}
-
-function urutkanPemain() {
-    appState.pemain.sort((a,b) => {
-        if (b.skor !== a.skor) return b.skor - a.skor;
-        return a.posisiSebelumnya - b.posisiSebelumnya;
-    });
-}
-
-// ✅ FUNGSI INI YANG SUDAH DIPERBAIKI SESUAI MAUMU
-function cekKandidatTerbakar() {
-    // Awalnya semua tidak bisa dibakar
-    appState.pemain.forEach(p => p.dapatTerbakar = false);
-
-    for (let i = 0; i < appState.pemain.length; i++) {
-        const pemainMaju = appState.pemain[i];
-
-        // Kalau yang maju nilainya negatif/0, tidak bisa membakar siapa pun
-        if (pemainMaju.skor <= 0) continue;
-
-        const posisiSebelumnya = pemainMaju.posisiSebelumnya;
-        const posisiSekarang = i + 1;
-
-        // Kalau benar-benar maju posisinya
-        if (posisiSekarang < posisiSebelumnya) {
-            // Cari orang yang posisinya tadi di atas, sekarang di BAWAH, DAN NILAINYA POSITIF
-            const yangBisaDibakar = appState.pemain.filter((p, indeks) => {
-                return indeks > i                  // Sekarang ada di bawah
-                    && p.posisiSebelumnya < posisiSebelumnya // Tadi ada di atas
-                    && p.skor > 0;                // ✅ PENTING: HANYA YANG POSITIF SAJA
-            });
-
-            // Tandai mereka yang bisa dibakar
-            yangBisaDibakar.forEach(p => p.dapatTerbakar = true);
-        }
-    }
-}
-
-function cekPemenangRonde() {
-    return appState.pemain.find(p => p.skor >= appState.targetKemenangan);
-}
-
-function prosesKemenangan(pemenang) {
-    antrekanSuara(`Selamat kepada ${pemenang.nama} mendapatkan bintang satu`);
-    mainkanAudio("audioGod");
-
-    setTimeout(() => {
-        tambahAnimasiBintang();
-        pemenang.bintang++;
-        tambahRiwayat(`⭐ ${pemenang.nama} mendapatkan BINTANG ke-${pemenang.bintang}!`);
-
-        setTimeout(() => {
-            antrekanSuara(`Silakan bandar kocok kartunya`);
-            catatKeArsipPemain();
-            simpanDataKePenyimpanan();
-            tampilkanKonfirmasiRondeBaru();
-        }, 2500);
-    }, 800);
-}
-
-function mulaiRondeBaru() {
-    catatKeArsipPemain();
-    simpanDataKePenyimpanan();
-
-    appState.pemain.forEach(p => {
-        p.skor = 0;
-        p.posisiSebelumnya = 1;
-        p.dapatTerbakar = false;
-    });
-    appState.ronde++;
-    appState.puteran = 0;
-    appState.cuplikanSebelumnya = [];
-
-    perbaruiSemuaAntarmuka();
-    simpanDataKePenyimpanan();
-}
-
-// ==============================================
-// ✅ SISTEM BAKARAN SESUAI SEMUA ATURAN
-// ==============================================
-function tampilkanPopupPilihPelaku(idKorban) {
-    const korban = appState.pemain.find(p => p.id === idKorban);
-    // Cek ulang: tidak bisa dibakar kalau nilainya tidak positif
-    if (!korban || !korban.dapatTerbakar || korban.skor <= 0) {
-        tampilkanPesanPeringatan("❌ Tidak bisa dibakar! Hanya pemain dengan nilai positif yang bisa dibakar.");
-        return;
-    }
-
-    const pilihanPelaku = appState.pemain.filter(p => p.id !== idKorban);
-    const opsiHtml = pilihanPelaku.map(p => `<option value="${p.id}">${p.nama}</option>`).join("");
-
-    tampilkanPopup(`
-        <h3>🔥 Siapa yang membakar?</h3>
-        <p>Korban: <strong>${korban.nama} (Nilai: ${formatAngka(korban.skor)})</strong></p>
-        <select id="pilihPelaku" class="input-text">${opsiHtml}</select>
-    `, () => {
-        const idPelaku = document.getElementById("pilihPelaku").value;
-        const pelaku = appState.pemain.find(p => p.id === idPelaku);
-        prosesBakaran(pelaku, korban);
-    });
-}
-
-function prosesBakaran(pelaku, korban) {
-    if (appState.sedangProses) return;
-    appState.sedangProses = true;
-
-    const cuplikanSebelum = buatCuplikanPenuh();
-    appState.cuplikanSebelumnya.push(cuplikanSebelum);
-
-    const nilaiAwalKorban = korban.skor; // Pasti POSITIF di sini
-
-    pelaku.membakar++;
-    korban.dibakar++;
-
-    const jumlahYangBisaDibakar = appState.pemain.filter(p => p.dapatTerbakar).length;
-    if (jumlahYangBisaDibakar >= 3) {
-        pelaku.tripleBakar++;
-        antrekanSuara("Triple Burn");
-        tambahRiwayat(`💣 TRIPLE BURN - ${pelaku.nama} membakar 3 pemain sekaligus!`);
-    }
-
-    antrekanSuara(`${pelaku.nama} membakar ${korban.nama}`);
-
-    setTimeout(() => {
-        // ✅ Nilai awal pasti positif, jadi SUARA BERBUNYI
-        mainkanAudio("audioNol");
-        tambahAnimasiApi();
-
-        setTimeout(() => {
-            // ✅ NILAINYA LANGSUNG JADI 0
-            korban.skor = 0;
-            korban.dapatTerbakar = false;
-            tambahRiwayat(`🔥 ${pelaku.nama} membakar ${korban.nama}! Nilai dikembalikan ke 0`);
-
-            urutkanPemain();
-            perbaruiSemuaAntarmuka();
-            catatKeArsipPemain();
-            simpanDataKePenyimpanan();
-            appState.sedangProses = false;
-        }, 1200);
-    }, 800);
-}
-
-// ==============================================
-// PERBARUI ANTARMUKA
-// ==============================================
-function perbaruiSemuaAntarmuka() {
-    document.getElementById("rondeInfo").textContent = appState.ronde;
-    document.getElementById("puteranInfo").textContent = appState.puteran;
-    document.getElementById("targetInfo").textContent = appState.targetKemenangan;
-    document.getElementById("btnUndo").disabled = appState.cuplikanSebelumnya.length === 0;
-
-    perbaruiKartuPemain();
-    perbaruiNamaDiKolomInput();
-    perbaruiTabRanking();
-    perbaruiTabRiwayat();
-    perbaruiTabStatistik();
-    perbaruiTabPencapaian();
-    perbaruiTabArsip();
-}
-
-function perbaruiKartuPemain() {
-    const wadah = document.getElementById("pemainContainer");
-    wadah.innerHTML = "";
-
-    appState.pemain.forEach(pemain => {
-        const kelasNegatif = pemain.skor < 0 ? "negatif" : "";
-        // ✅ Tombol bakar mati otomatis kalau nilainya <= 0
-        const kelasBakar = (pemain.dapatTerbakar && pemain.skor > 0) ? "aktif" : "mati";
-        const teksTombol = pemain.skor <= 0 ? "Nilai minus/0" : (pemain.dapatTerbakar ? "🔥 BAKAR SEKARANG" : "Belum bisa dibakar");
-        const teksBintang = pemain.bintang > 0 ? `<span>⭐ ${pemain.bintang}</span>` : "Belum ada";
-
-        const kartu = document.createElement("div");
-        kartu.className = `player-card ${kelasNegatif}`;
-        kartu.innerHTML = `
-            <div class="player-header">
-                <h3 class="nama-pemain" data-id="${pemain.id}">${pemain.nama}</h3>
-                <button class="btn-edit-nama" data-id="${pemain.id}">✏️</button>
-            </div>
-            <div class="skor-container">
-                <span class="skor-total ${kelasNegatif}">${formatAngka(pemain.skor)}</span>
-            </div>
-            <div class="info-bintang">
-                Bintang: ${teksBintang}
-            </div>
-            <button class="btn-bakar ${kelasBakar}" data-id="${pemain.id}" ${kelasBakar === "mati" ? "disabled" : ""}>
-                ${teksTombol}
-            </button>
-        `;
-        wadah.appendChild(kartu);
-    });
-
-    document.querySelectorAll(".btn-edit-nama").forEach(tombol => {
-        tombol.addEventListener("click", () => tampilkanEditNama(tombol.dataset.id));
-    });
-    document.querySelectorAll(".btn-bakar").forEach(tombol => {
-        tombol.addEventListener("click", () => tampilkanPopupPilihPelaku(tombol.dataset.id));
-    });
-}
-
-function perbaruiNamaDiKolomInput() {
-    document.getElementById("labelSkorA").textContent = appState.pemain[0].nama;
-    document.getElementById("labelSkorB").textContent = appState.pemain[1].nama;
-    document.getElementById("labelSkorC").textContent = appState.pemain[2].nama;
-    document.getElementById("labelSkorD").textContent = appState.pemain[3].nama;
-}
-
-function tampilkanEditNama(idPemain) {
-    const pemain = appState.pemain.find(p => p.id === idPemain);
-    if (!pemain) return;
-
-    tampilkanPopup(`
-        <h3>✏️ Ubah Nama Pemain</h3>
-        <input type="text" id="inputNamaBaru" class="input-text" value="${pemain.nama}" maxlength="20">
-    `, () => {
-        const namaBaru = document.getElementById("inputNamaBaru").value.trim();
-        if (namaBaru && namaBaru !== pemain.nama) {
-            if (appState.arsipPemain[pemain.nama]) {
-                appState.arsipPemain[namaBaru] = appState.arsipPemain[pemain.nama];
-                delete appState.arsipPemain[pemain.nama];
-            }
-            pemain.nama = namaBaru;
-            catatKeArsipPemain();
-            perbaruiSemuaAntarmuka();
-            simpanDataKePenyimpanan();
-        }
-    });
-}
-
-function tambahRiwayat(teks) {
-    appState.riwayat.unshift({ waktu: new Date().toLocaleTimeString(), teks: teks });
-    if (appState.riwayat.length > 100) appState.riwayat.pop();
-}
-
-// ==============================================
-// SISTEM SUARA & BANTUAN LAINNYA
-// ==============================================
-function inisialisasiSuara() {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-}
-
-function antrekanSuara(teks) {
-    appState.antreanSuara.push(teks);
-}
-
-function lanjutkanAntreanSuara() {
-    if (appState.sedangBerbicara || appState.antreanSuara.length === 0 || !window.speechSynthesis) return;
-
-    const teks = appState.antreanSuara.shift();
-    const ucapan = new SpeechSynthesisUtterance(teks);
-    ucapan.lang = "id-ID";
-    ucapan.rate = 1;
-    ucapan.pitch = 1;
-
-    ucapan.onstart = () => appState.sedangBerbicara = true;
-    ucapan.onend = ucapan.onerror = () => {
-        appState.sedangBerbicara = false;
-    };
-
-    window.speechSynthesis.speak(ucapan);
-}
-
-function jalankanUrutanSuaraSetelahPuteran() {
-    const pemainTerbawah = cariPemainPosisiTerbawah();
-    if (pemainTerbawah) {
-        antrekanSuara(`Giliran ${pemainTerbawah.nama} kocok kartu`);
-    }
-}
-
-function cariPemainPosisiTerbawah() {
-    return [...appState.pemain].sort((a,b) => a.skor - b.skor)[0];
-}
-
-function mainkanAudio(id) {
-    const audio = document.getElementById(id);
-    if (audio) {
-        audio.currentTime = 0;
-        audio.play().catch(err => console.log("Gagal memutar suara:", err));
-    }
-}
-
-function tambahAnimasiApi() {
-    const kanvas = document.getElementById("fireCanvas");
-    kanvas.classList.add("aktif");
-    setTimeout(() => kanvas.classList.remove("aktif"), 1200);
-}
-
-function tambahAnimasiBintang() {
-    const kanvas = document.getElementById("starCanvas");
-    kanvas.classList.add("aktif");
-    setTimeout(() => kanvas.classList.remove("aktif"), 2500);
-}
-
-function formatAngka(angka) {
-    return angka < 0 ? `${angka}` : `+${angka}`;
-}
-
-function batalkanLangkahTerakhir() {
-    if (appState.cuplikanSebelumnya.length === 0) return;
-    const cuplikanTerakhir = appState.cuplikanSebelumnya.pop();
-    pulihkanDariCuplikan(cuplikanTerakhir);
-    tambahRiwayat("↩️ Membatalkan langkah terakhir");
-}
-
-function tampilkanKonfirmasiReset() {
-    tampilkanPopup(`
-        <h3>🗑️ Reset Permainan?</h3>
-        <p>Permainan akan dimulai ulang, tapi data bintang & riwayat tetap tersimpan.</p>
-    `, () => {
-        const arsipLama = JSON.parse(JSON.stringify(appState.arsipPemain));
-        const temaLama = appState.tema;
-
-        appState = {
-            halaman: "utama",
-            tema: temaLama,
-            ronde: 1,
-            puteran: 0,
-            targetKemenangan: APLIKASI.defaultTarget,
-            pemain: [
-                { id: "a", nama: "Pemain A", skor: 0, posisiSebelumnya: 1, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false },
-                { id: "b", nama: "Pemain B", skor: 0, posisiSebelumnya: 2, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false },
-                { id: "c", nama: "Pemain C", skor: 0, posisiSebelumnya: 3, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false },
-                { id: "d", nama: "Pemain D", skor: 0, posisiSebelumnya: 4, bintang: 0, dibakar: 0, membakar: 0, tripleBakar: 0, skorTertinggi: 0, dapatTerbakar: false }
-            ],
-            riwayat: [],
-            arsipPemain: arsipLama,
-            cuplikanSebelumnya: [],
-            antreanSuara: [],
-            sedangBerbicara: false,
-            sedangProses: false
-        };
-
-        simpanDataKePenyimpanan();
-        tampilkanHalamanYangSesuai();
-        tutupPopup();
-    });
-}
-
-function tampilkanKonfirmasiRondeBaru() {
-    tampilkanPopup(`
-        <h3>🏁 Ronde Selesai!</h3>
-        <p>Ingin memulai ronde berikutnya?</p>
-    `, () => {
-        mulaiRondeBaru();
-        tutupPopup();
-    });
-}
-
-function tampilkanPesanPeringatan(teks) {
-    tampilkanPopup(`<p style="text-align:center; font-size:16px;">${teks}</p>`, () => {});
-}
-
-function tampilkanPopup(konten, fungsiOke) {
-    const wadah = document.getElementById("popupOverlay");
-    const isi = document.getElementById("popupContent");
-    const tombolOke = document.getElementById("popupBtn2");
-
-    isi.innerHTML = konten;
-    wadah.classList.add("aktif");
-
-    // Hapus pendengar lama agar tidak menumpuk
-    const pendengarBaru = () => {
-        tutupPopup();
-        if (typeof fungsiOke === "function") fungsiOke();
-        tombolOke.removeEventListener("click", pendengarBaru);
-    };
-
-    tombolOke.addEventListener("click", pendengarBaru);
-}
-
-function tutupPopup() {
-    document.getElementById("popupOverlay").classList.remove("aktif");
-}
-
-function gantiTema() {
-    appState.tema = appState.tema === "gelap" ? "terang" : "gelap";
-    terapkanTema();
-    simpanDataKePenyimpanan();
-}
-
-function terapkanTema() {
-    document.body.classList.toggle("tema-terang", appState.tema === "terang");
-    const tombol = document.getElementById("btnTheme");
-    tombol.textContent = appState.tema === "gelap" ? "☀️" : "🌙";
-    tombol.title = appState.tema === "gelap" ? "Ganti ke tema terang" : "Ganti ke tema gelap";
-}
-
-function masukLayarPenuh() {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(err => console.log("Tidak bisa masuk layar penuh:", err));
-    } else {
-        document.exitFullscreen().catch(err => console.log("Tidak bisa keluar layar penuh:", err));
-    }
-}
-
-function ambilTangkapanLayar() {
-    tampilkanPesanPeringatan("📸 Fitur tangkapan layar sedang dalam pengembangan!");
-}
-
-function bukaTab(namaTab) {
-    document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("aktif"));
-    document.querySelectorAll(".tab-page").forEach(page => page.classList.remove("aktif"));
-
-    document.querySelector(`.tab-btn[data-tab="${namaTab}"]`).classList.add("aktif");
-    document.getElementById(`tab${namaTab.charAt(0).toUpperCase() + namaTab.slice(1)}`).classList.add("aktif");
-}
-
-function perbaruiTabRanking() {
-    const wadah = document.getElementById("rankingList");
-    const urutan = [...appState.pemain].sort((a,b) => b.skor - a.skor);
-    wadah.innerHTML = urutan.map((p, i) => `
-        <div class="list-item ${i === 0 ? 'juara' : ''}">
-            <span class="peringkat">${i+1}</span>
-            <span class="nama">${p.nama}</span>
-            <span class="nilai ${p.skor < 0 ? 'negatif' : ''}">${formatAngka(p.skor)}</span>
-        </div>
-    `).join("");
-}
-
-function perbaruiTabRiwayat() {
-    const wadah = document.getElementById("historyList");
-    wadah.innerHTML = appState.riwayat.map(r => `
-        <div class="list-item riwayat">
-            <span class="waktu">${r.waktu}</span>
-            <span class="teks">${r.teks}</span>
-        </div>
-    `).join("");
-}
-
-function perbaruiTabStatistik() {
-    const wadah = document.getElementById("statistikList");
-    wadah.innerHTML = appState.pemain.map(p => `
-        <div class="statistik-kartu">
-            <h4>${p.nama}</h4>
-            <p>⭐ Bintang: ${p.bintang}</p>
-            <p>🔥 Berhasil membakar: ${p.membakar} kali</p>
-            <p>💀 Pernah dibakar: ${p.dibakar} kali</p>
-            <p>💣 Triple bakar: ${p.tripleBakar} kali</p>
-            <p>📈 Nilai tertinggi: ${formatAngka(p.skorTertinggi)}</p>
-        </div>
-    `).join("");
-}
-
-function perbaruiTabPencapaian() {
-    const wadah = document.getElementById("achievementList");
-    const semuaPemain = Object.values(appState.arsipPemain);
-    wadah.innerHTML = semuaPemain.map(p => `
-        <div class="statistik-kartu">
-            <h4>🏆 ${p.nama}</h4>
-            <p>⭐ Total bintang: ${p.bintang}</p>
-            <p>🔥 Total membakar: ${p.membakar}</p>
-            <p>💣 Triple bakar terbanyak: ${p.tripleBakar}</p>
-            <p>📈 Rekor nilai: ${formatAngka(p.skorTertinggi)}</p>
-        </div>
-    `).join("") || "<p>Belum ada data pencapaian</p>";
-}
-
-function perbaruiTabArsip() {
-    perbaruiTabPencapaian();
-}
-
-function daftarkanPWA() {
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/service-worker.js').catch(err => console.log("Pendaftaran PWA gagal:", err));
-        });
+function loadData() {
+    const data = localStorage.getItem('scoreCekihData');
+    if (data) {
+        const parsed = JSON.parse(data);
+        state.players = parsed.players || [];
+        state.ronde = parsed.ronde || 1;
+        state.putaran = parsed.putaran || 0;
+        state.targetScore = parsed.targetScore || 1000;
+        state.history = parsed.history || [];
+        state.stats = parsed.stats || {};
+        state.archives = parsed.archives || [];
     }
 }
