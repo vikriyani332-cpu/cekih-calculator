@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0f172a">
+<meta name="description" content="Score Cekih by Sadewa Corp">
+
+<link rel="manifest" href="manifest.json">
+
+<link rel="icon" type="image/png" sizes="192x192" href="classic-192.png">
+<link rel="apple-touch-icon" href="classic-192.png">
+
+<title>Score Cekih by Sadewa Corp</title>
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="dark">
+
+<div id="loadingScreen">
+    <div class="loading-content">
+        <img src="classic-512.png" class="loading-logo" alt="Logo">
+        <h1>Score Cekih</h1>
+        <p>by Sadewa Corp</p>
+
+        <div class="loading-bar">
+            <div class="loading-progress" id="loadingProgress"></div>
+        </div>
+    </div>
+</div>
+
+<div id="fireAnimation"></div>
+<div id="starAnimation"></div>
+
+<div id="app">
+
+<header class="topbar">
+
+<div class="brand">
+<img src="classic-512.png" alt="Logo">
+<div>
+<h2>Score Cekih</h2>
+<small>by Sadewa Corp</small>
+</div>
+</div>
+
+<div class="top-actions">
+<button id="themeBtn">🌙</button>
+<button id="fullscreenBtn">⛶</button>
+<button id="screenshotBtn">📸</button>
+</div>
+
+</header>
+
+<section id="setupSection" class="card">
+
+<h3>Setup Permainan</h3>
+
+<div class="grid2">
+<input id="playerA" placeholder="Nama Pemain A" value="Pemain A">
+<input id="playerB" placeholder="Nama Pemain B" value="Pemain B">
+<input id="playerC" placeholder="Nama Pemain C" value="Pemain C">
+<input id="playerD" placeholder="Nama Pemain D" value="Pemain D">
+</div>
+
+<label>Target Kemenangan</label>
+<input id="targetScore" type="number" value="1000">
+
+<button id="startGameBtn" class="primary-btn">
+🎮 MULAI PERMAINAN
+</button>
+
+</section>
+
+<section id="gameSection" class="hidden">
+
+<div class="game-info card">
+<div>
+<h3 id="roundText">RONDE 1</h3>
+<p id="turnText">PUTERAN 1</p>
+</div>
+</div>
+
+<div id="playerCards"></div>
+
+<div class="card">
+
+<h3>Input Skor Puteran</h3>
+
+<div id="scoreInputs"></div>
+
+<button id="saveTurnBtn" class="primary-btn">
+💾 SIMPAN PUTERAN
+</button>
+
+</div>
+
+<div class="action-row">
+<button id="undoBtn">↩ UNDO</button>
+<button id="editNamesBtn">✏️ EDIT NAMA</button>
+</div>
+
+<div class="tabs">
+
+<button class="tab-btn active" data-tab="rankingTab">Ranking</button>
+<button class="tab-btn" data-tab="historyTab">History</button>
+<button class="tab-btn" data-tab="achievementTab">Achievement</button>
+<button class="tab-btn" data-tab="statsTab">Statistik</button>
+<button class="tab-btn" data-tab="archiveTab">Arsip Pemain</button>
+
+</div>
+
+<div class="tab-content active" id="rankingTab">
+<div class="card">
+<ul id="rankingList"></ul>
+</div>
+</div>
+
+<div class="tab-content" id="historyTab">
+<div class="card">
+<ul id="historyList"></ul>
+</div>
+</div>
+
+<div class="tab-content" id="achievementTab">
+<div class="card">
+<div id="achievementList"></div>
+</div>
+</div>
+
+<div class="tab-content" id="statsTab">
+<div class="card">
+<div id="statsList"></div>
+</div>
+</div>
+
+<div class="tab-content" id="archiveTab">
+<div class="card">
+<div id="archiveList"></div>
+</div>
+</div>
+
+</section>
+
+<button id="resetBtn">
+🗑 RESET GAME
+</button>
+
+</div>
+
+<audio id="godOfGamblerAudio" preload="auto">
+<source src="godofgambler.wav" type="audio/wav">
+</audio>
+
+<audio id="resetAudio" preload="auto">
+<source src="dimulaidari0.wav" type="audio/wav">
+</audio>
+
+<script src="app.js"></script>
+
+</body>
+</html>
