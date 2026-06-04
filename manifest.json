@@ -1,59 +1,21 @@
 {
-    "name": "Score Cekih by Sadewa Corp",
-    "short_name": "Score Cekih",
-    "description": "Aplikasi penghitung skor premium elegan untuk permainan kartu",
-    "version": "1.1.0",
-    "start_url": "/?utm_source=pwa",
-    "scope": "/",
-    "display": "standalone",
-    "orientation": "portrait",
-    "theme_color": "#1a1410",
-    "background_color": "#1a1410",
-    "lang": "id-ID",
-    "dir": "ltr",
-    "prefer_related_applications": false,
-    "icons": [
-        {
-            "src": "classic-192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "any maskable"
-        },
-        {
-            "src": "classic-512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "any maskable"
-        }
-    ],
-    "splash_pages": null,
-    "launch_handler": {
-        "client_mode": "navigate-existing"
+  "name": "Score Cekih by Sadewa Corp",
+  "short_name": "Score Cekih",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#1a1a1a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "classic-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
     },
-    "categories": ["games", "utilities", "entertainment"],
-    "screenshots": [],
-    "shortcuts": [
-        {
-            "name": "Permainan Baru",
-            "short_name": "Baru",
-            "url": "/#setup",
-            "icons": [
-                {
-                    "src": "classic-192.png",
-                    "sizes": "192x192"
-                }
-            ]
-        },
-        {
-            "name": "Lihat Riwayat",
-            "short_name": "Riwayat",
-            "url": "/#history",
-            "icons": [
-                {
-                    "src": "classic-192.png",
-                    "sizes": "192x192"
-                }
-            ]
-        }
-    ]
+    {
+      "src": "classic-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
